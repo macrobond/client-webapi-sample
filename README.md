@@ -15,7 +15,7 @@ The sample is using .NET Core 3.1. You can find more information and download th
 
 To download the source code for the sample server, you can use a git command
 ```bash
-git clone git@github.com:macrobond/client-webapi-sample client-webapi-sample
+git clone https://github.com/macrobond/client-webapi-sample.git client-webapi-sample
 ```
 The solution file SeriesServer.sln can be opened in Visual Studio 2019, but you can also compile it from the command prompt and use other tools such as [Visual Studio Code](https://code.visualstudio.com/).
 The sample should be able to compile and run on Windows and Linux.
