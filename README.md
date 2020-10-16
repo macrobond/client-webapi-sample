@@ -17,5 +17,8 @@ The sample is using .NET Core 3.1. The solution file SeriesServer.sln can be ope
 The sample should be able to compile and run on Windows and Linux.
 
 ## Running the server
+By default, the sample will use the Kestrel Web server implementation in .NET Core.
+The server will listen to http://localhost:5000, but you can use the command line parameter --urls to configure another address.
+For more details about the Kestrel server see the [Microsoft documentation](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel).
 
 ## Testing the server
