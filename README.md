@@ -13,9 +13,20 @@ By implementing the Web Provider API in your service, the Macrobond Application 
 You can find the documentation of the API [here](https://help.macrobond.com/?page_id=8589&preview=true).
 
 ## Building the server
-The sample is using .NET Core 3.1. The solution file SeriesServer.sln can be opened in Visual Studio 2019, but you can also compile it from the command prompt and use other tools such as [Visual Studio Code](https://code.visualstudio.com/).
+The sample is using .NET Core 3.1. You can find more information and download the SDK at the [Microsoft site](https://dotnet.microsoft.com/download/dotnet-core)
+
+To download the source code for the sample server, you can use a git command
+```bash
+git clone git@github.com:macrobond/client-webapi-sample client-webapi-sample
+```
+The solution file SeriesServer.sln can be opened in Visual Studio 2019, but you can also compile it from the command prompt and use other tools such as [Visual Studio Code](https://code.visualstudio.com/).
 The sample should be able to compile and run on Windows and Linux.
 
+if you do not want to use a development environment, you can build and run from the command prompt.
+```bash
+cd client-webapi-sample/SeriesServer
+dotnet run
+```
 ## Running the server
 By default, the sample will use the Kestrel Web server implementation in .NET Core.
 The server will listen to http://localhost:5000, but you can use the command line parameter --urls to configure another address.
