@@ -13,6 +13,8 @@ By implementing the Web Provider API in your service, the Macrobond Application 
 You can find the documentation of the API [here](https://help.macrobond.com/?page_id=8589&preview=true).
 
 ## Building the server
+The sample is using .NET Core 3.1. The solution file SeriesServer.sln can be opened in Visual Studio 2019, but you can also compile it from the command prompt and use other tools such as [Visual Studio Code](https://code.visualstudio.com/).
+The sample should be able to compile and run on Windows and Linux.
 
 ## Running the server
 
