@@ -4,5 +4,6 @@
 
 /SeriesServer/bin
 /SeriesServer/obj
-/.vs/SeriesServer/v16
+/.vs
 /SeriesServer/.config/dotnet-tools.json
+/SeriesServer/SeriesServer.csproj.user
