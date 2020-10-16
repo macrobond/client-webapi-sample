@@ -1,8 +1,6 @@
 Sample server for Macrobond Client Application Web Provider API
 ============================
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-
 Sample server written in C#/.NET Core that can serve the Macrobond Application with time series.
 
 By implementing the Web Provider API in your service, the Macrobond Application can retrieve time series that you provide. The service can also offer one ore more of the following functions that enables additional functionality for this database in the Macrobond application:
