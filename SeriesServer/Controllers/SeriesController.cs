@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Data;
 using System.Linq;
 using System.Net;
 using System.Text.Json;
@@ -70,81 +71,30 @@ namespace SeriesServer.Controllers
                 if (series == null)
                     return new DownloadResult("Series could not be found!");
                 series.Values = series.Values.Reverse().ToArray();
-                series.MetaData[LastModifiedTimeStamp] = DateTime.Now;
+                // series.MetaData[LastModifiedTimeStamp] = DateTime.Now;
                 return new DownloadResult(series);
             }
         }
 
         /// <summary>
-        /// Creaste or replace a series.
+        /// Create or replace a series.
         /// </summary>
         /// <param name="series">The series data including values, dates and metadat.</param>
-        /// <param name="lastModified">Included when a series is replaced. This is the timestamp returned from the previous call to this method or LoadSeries. Typically the save operation fails if this does not match the strored series.</param>
+        /// <param name="lastModified">Included when a series is replaced. This is the timestamp returned from the previous call to this method or LoadSeries. Typically the save operation fails if this does not match the stored series.</param>
+        /// <param name="forceReplace">Replace series even if lastModified timestamp is not specified or not matching.</param>
         /// <returns>The timestamp when the series was stored.</returns>
         /// <remarks>This method will only ever be called if the server has returned EditSeries capability in GetCapabalities</remarks>
         [HttpPost("createseries")]
-        public ActionResult<DateTime> CreateSeries([FromBody] Series series, [FromQuery] DateTime? lastModified)
+        public ActionResult<DateTime> CreateSeries([FromBody] Series series, [FromQuery] DateTime? lastModified, [FromQuery] bool? forceReplace)
         {
-            // Convert the values to the expected types
-
-            Dictionary<string, object> meta = new Dictionary<string, object>();
-            foreach (var x in series.MetaData)
-            {
-                var jsonElementValue = (JsonElement)x.Value;
-
-                object val;
-
-                if (jsonElementValue.ValueKind == JsonValueKind.Number)
-                {
-                    if (jsonElementValue.TryGetInt32(out int i))
-                        val = i;
-                    else if (jsonElementValue.TryGetDouble(out double d))
-                        val = d;
-                    else if (jsonElementValue.TryGetInt64(out long l))
-                        val = l;
-                    else
-                        val = jsonElementValue.ToString();
-                }
-                else if (jsonElementValue.ValueKind == JsonValueKind.Array)
-                {
-                    var enumerator = jsonElementValue.EnumerateArray();
-                    val = enumerator.Select(x => x.ToString());
-                }
-                else
-                {
-                    string str = jsonElementValue.ToString();
-
-                    if (DateTime.TryParse(str, out DateTime dt))
-                        val = dt;
-                    else
-                        val = str;
-                }
-
-                meta.Add(x.Key, val);
-            }
-
-            List<object> values = new List<object>();
-            foreach (var x in series.Values)
-            {
-                var jsonElementValue = (JsonElement)x;
-
-                object val;
-
-                if (jsonElementValue.TryGetInt32(out int i))
-                    val = i;
-                else if (jsonElementValue.TryGetDouble(out double d))
-                    val = d;
-                else if (jsonElementValue.TryGetInt64(out long l))
-                    val = l;
-                else
-                    val = jsonElementValue.ToString();
-
-                values.Add(val);
-            }
+            Dictionary<string, object> meta = DeserializeMetaData(series);
+            List<object> values = DeserializeValues(series);
 
             Series newSeries = new Series(meta, values.ToArray(), series.Dates);
 
-            string name = (string)newSeries.MetaData["PrimName"];
+            string name = (string)meta["PrimName"];
+            var now = DateTime.Now;
+            meta[LastModifiedTimeStamp] = now;
 
             lock (m_lock)
             {
@@ -156,6 +106,12 @@ namespace SeriesServer.Controllers
                     var item = m_dataBase[index];
                     if ((string)item.MetaData["PrimName"] == name)
                     {
+                        if (forceReplace == true)
+                        {
+                            m_dataBase[index] = newSeries;
+                            return Ok(now);
+                        }
+
                         if (lastModified is null)
                             return Conflict("Series with that name already exists");
 
@@ -163,14 +119,14 @@ namespace SeriesServer.Controllers
                         if (lastModified == oldDt)
                         {
                             m_dataBase[index] = newSeries;
-                            return Ok((DateTime)item.MetaData[LastModifiedTimeStamp]);
+                            return Ok(now);
                         }
                         else
-                            return Conflict("LastModified does not match!");
+                            return Conflict("LastModified does not match");
                     }
                 }
 
-                if (lastModified != null)
+                if (lastModified != null || forceReplace == true)
                     NotFound();
 
                 // Just add to the list returned when browsing
@@ -187,17 +143,17 @@ namespace SeriesServer.Controllers
                 }
             }
 
-            return Ok(lastModified);
+            return Ok(now);
         }
 
         /// <summary>
         /// Removes a series from the database.
         /// </summary>
-        /// <param name="name">Name of ther series to be removed.</param>
+        /// <param name="name">Names of the series to be removed.</param>
         /// <returns>Returns 404 if series could not be found.</returns>
         /// <remarks>This method will only ever be called if the server has returned EditSeries capability in GetCapabalities</remarks>
         [HttpPost("removeseries")]
-        public ActionResult RemoveSeries([FromBody] string name)
+        public ActionResult RemoveSeries([Required][FromQuery(Name = "n")] string name)
         {
             bool found;
             lock (m_lock)
@@ -245,8 +201,8 @@ namespace SeriesServer.Controllers
             }
 
             if (found)
-                    return Ok();
-                return NotFound();
+                return Ok();
+            return NotFound();
         }
 
         /// <summary>
@@ -343,6 +299,71 @@ namespace SeriesServer.Controllers
                 return list;
 
             return NotFound();
+        }
+
+        private static List<object> DeserializeValues(Series series)
+        {
+            List<object> values = new List<object>();
+            foreach (var x in series.Values)
+            {
+                var jsonElementValue = (JsonElement)x;
+
+                object val;
+
+                if (jsonElementValue.TryGetInt32(out int i))
+                    val = i;
+                else if (jsonElementValue.TryGetDouble(out double d))
+                    val = d;
+                else if (jsonElementValue.TryGetInt64(out long l))
+                    val = l;
+                else
+                    val = jsonElementValue.ToString();
+
+                values.Add(val);
+            }
+
+            return values;
+        }
+
+        private static Dictionary<string, object> DeserializeMetaData(Series series)
+        {
+            Dictionary<string, object> meta = new Dictionary<string, object>();
+            foreach (var x in series.MetaData)
+            {
+                var jsonElementValue = (JsonElement)x.Value;
+
+                object val;
+
+                if (jsonElementValue.ValueKind == JsonValueKind.Number)
+                {
+                    if (jsonElementValue.TryGetInt32(out int i))
+                        val = i;
+                    else if (jsonElementValue.TryGetDouble(out double d))
+                        val = d;
+                    else if (jsonElementValue.TryGetInt64(out long l))
+                        val = l;
+                    else
+                        val = jsonElementValue.ToString();
+                }
+                else if (jsonElementValue.ValueKind == JsonValueKind.Array)
+                {
+                    var enumerator = jsonElementValue.EnumerateArray();
+                    val = enumerator.Select(x => x.ToString());
+                }
+                else
+                {
+                    string str = jsonElementValue.ToString();
+
+                    if (DateTime.TryParse(str, out DateTime dt))
+                        val = dt;
+                    else
+                        val = str;
+                }
+
+                meta.Add(x.Key, val);
+            }
+
+            return meta;
         }
 
         /// <summary>
@@ -530,12 +551,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "Total" },
                     { "Region", new string[] { "pl", "se"} },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2003, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltour0001" },
-                    { "LastModifiedTimeStamp", new DateTime(2003, 01, 01, 0, 0, 0) },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -561,11 +580,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "Other" },
                     { "Region", "pl" },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2004, 11, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0021" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -584,11 +602,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "Food" },
                     { "Region", "pl" },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2002, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0014" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -608,11 +625,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "New Passenger Car" },
                     { "Region", "pl" },
-                    { "Source", "src_ecb" },
                     { "StartDate", new DateTime(2003, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "ecb_stsmplwcregpc00003abs" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -633,11 +649,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "Total" },
                     { "Region", "se" },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2005, 01, 01, 0, 0, 0) },
                     { "Frequency", "annual" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0135" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -650,11 +665,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "Total" },
                     { "Region", "se" },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2005, 01, 01, 0, 0, 0) },
                     { "Frequency", "annual" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0131" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -667,11 +681,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "Total" },
                     { "Region", "pl" },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0051" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -705,10 +718,8 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "Total" },
                     { "Region", "se" },
-                    { "Source", "src_sescb" },
                     { "StartDate", new DateTime(2000, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad2195" },
                 },
                 new object[]
@@ -742,10 +753,9 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "DateTime skip test" },
                     { "Region", "mb" },
-                    { "Source", "me" },
                     { "StartDate", new DateTime(2017, 01, 01, 0, 0, 0) },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "dt" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -766,11 +776,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "Total, Goods" },
                     { "Region", "se" },
-                    { "Source", "src_sescb" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad2136" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -804,11 +813,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "Total, except of Motor Vehicles" },
                     { "Region", "se" },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad2128" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -842,11 +850,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "New Passenger Car" },
                     { "Region", "se" },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1990, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "ecb_stsmsewcregpc00003abs" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -873,11 +880,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "Balance (Goods)" },
                     { "Region", "se" },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1995, 01, 01, 0, 0, 0) },
                     { "Frequency", "quarterly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad1588" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -892,11 +898,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "United States" },
                     { "Region", "se" },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1978, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setour0039" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
@@ -928,11 +933,10 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "United States" },
                     { "Region", "se" },
-                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1978, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setour0141" },
+                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
                 new object[]
                 {
