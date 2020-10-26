@@ -549,7 +549,7 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Total" },
+                    { "Description", "Arrivals, Total" },
                     { "Region", new string[] { "pl", "se"} },
                     { "StartDate", new DateTime(2003, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
@@ -578,7 +578,7 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Other" },
+                    { "Description", "Domestic Trade, Wholesale Trade" },
                     { "Region", "pl" },
                     { "StartDate", new DateTime(2004, 11, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
@@ -600,7 +600,7 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Food" },
+                    { "Description", "Domestic Trade, Food" },
                     { "Region", "pl" },
                     { "StartDate", new DateTime(2002, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
@@ -623,7 +623,7 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "New Passenger Car" },
+                    { "Description", "Domestic Trade, New Passenger Car" },
                     { "Region", "pl" },
                     { "StartDate", new DateTime(2003, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
@@ -647,8 +647,8 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Total" },
-                    { "Region", "se" },
+                    { "Description", "Foreign Trade, Export, United States" },
+                    { "Region", "pl" },
                     { "StartDate", new DateTime(2005, 01, 01, 0, 0, 0) },
                     { "Frequency", "annual" },
                     { "PrimName", "pltrad0135" },
@@ -663,8 +663,8 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Total" },
-                    { "Region", "se" },
+                    { "Description", "Foreign Trade, Import, United States" },
+                    { "Region", "pl" },
                     { "StartDate", new DateTime(2005, 01, 01, 0, 0, 0) },
                     { "Frequency", "annual" },
                     { "PrimName", "pltrad0131" },
@@ -679,7 +679,7 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Total" },
+                    { "Description", "Foreign Trade, Trade Balance" },
                     { "Region", "pl" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
@@ -716,10 +716,11 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Total" },
+                    { "Description", "Domestic Trade, Wholesale Trade" },
                     { "Region", "se" },
                     { "StartDate", new DateTime(2000, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "CalAdj", "ca" },
                     { "PrimName", "setrad2195" },
                 },
                 new object[]
@@ -774,7 +775,7 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Total, Goods" },
+                    { "Description", "Domestic Trade, Wholesale Trade" },
                     { "Region", "se" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
@@ -811,7 +812,7 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
-                    { "Description", "Total, except of Motor Vehicles" },
+                    { "Description", "Domestic Trade except of Motor Vehicles" },
                     { "Region", "se" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
@@ -878,7 +879,7 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
-                    { "Description", "Balance (Goods)" },
+                    { "Description", "Export (Goods)" },
                     { "Region", "se" },
                     { "StartDate", new DateTime(1995, 01, 01, 0, 0, 0) },
                     { "Frequency", "quarterly" },
@@ -896,7 +897,7 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
-                    { "Description", "United States" },
+                    { "Description", "Hotel Nights, United States" },
                     { "Region", "se" },
                     { "StartDate", new DateTime(1978, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
@@ -931,7 +932,7 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
-                    { "Description", "United States" },
+                    { "Description", "Youth Hotel Nights, United States" },
                     { "Region", "se" },
                     { "StartDate", new DateTime(1978, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
