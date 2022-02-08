@@ -8,7 +8,7 @@ By implementing the Web Provider API in your service, the Macrobond Application 
 - Browse: Gives the user the option to navigate the database using a tree structure in the same way as with the databases provided by Macrobond.
 - Search: Gives the user the option to search the database by entering a text that is then passed to the API. The API typically uses this to provide text searching.
 
-You can find the documentation of the API [here](https://help.macrobond.com/technical-information/web-api-provider/).
+You can find the documentation of the API [here](https://help.macrobond.com/technical-information/the-macrobond-web-api-provider/).
 
 ## Building the server
 The sample is using .NET Core 3.1. You can find more information and download the SDK at the [Microsoft site](https://dotnet.microsoft.com/download/dotnet-core)
