@@ -1,4 +1,4 @@
-﻿// Macrobond Financial AB 2020
+﻿// Macrobond Financial AB 2020-2022
 
 using System;
 using System.Collections.Generic;
@@ -9,7 +9,6 @@ using System.Net;
 using System.Text.Json;
 
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 
 #nullable enable
 
@@ -67,10 +66,10 @@ namespace SeriesServer.Controllers
 
             DownloadResult LoadSeriesInternal(string name)
             {
-                Series series = LoadSeriesCore(name);
+                Series? series = LoadSeriesCore(name);
                 if (series == null)
                     return new DownloadResult("Series could not be found!");
-                series.Values = series.Values.Reverse().ToArray();
+                // series.Values = series.Values.Reverse().ToArray();
                 // series.MetaData[LastModifiedTimeStamp] = DateTime.Now;
                 return new DownloadResult(series);
             }
@@ -152,7 +151,7 @@ namespace SeriesServer.Controllers
         /// <param name="name">Names of the series to be removed.</param>
         /// <returns>Returns 404 if series could not be found.</returns>
         /// <remarks>This method will only ever be called if the server has returned EditSeries capability in GetCapabalities</remarks>
-        [HttpPost("removeseries")]
+        [HttpGet("removeseries")]
         public ActionResult RemoveSeries([Required][FromQuery(Name = "n")] string name)
         {
             bool found;
@@ -215,7 +214,7 @@ namespace SeriesServer.Controllers
         /// </summary>
         /// <param name="name">Name of series.</param>
         /// <returns>Requested series of null if no series with that name could be found.</returns>
-        private Series LoadSeriesCore(string name)
+        private Series? LoadSeriesCore(string name)
         {
             lock (m_lock)
                 return m_dataBase.FirstOrDefault(s => string.Compare((string)s.MetaData["PrimName"], name, StringComparison.OrdinalIgnoreCase) == 0);
@@ -262,7 +261,7 @@ namespace SeriesServer.Controllers
                         {
                             var series = new List<Series>(seriesRow.Names.Length);
                             foreach (var entityName in seriesRow.Names)
-                                series.Add(LoadSeriesCore(entityName));
+                                series.Add(LoadSeriesCore(entityName)!);
 
                             seriesRow.EntityMeta = series.Select(x => x is null || x.MetaData is null ? null : x.MetaData).ToArray(); ;
                         }
@@ -306,20 +305,14 @@ namespace SeriesServer.Controllers
             List<object> values = new List<object>();
             foreach (var x in series.Values)
             {
-                var jsonElementValue = (JsonElement)x;
+                object value = x switch 
+                {
+                    JsonElement { ValueKind: JsonValueKind.Number } e when e.TryGetDouble(out var d) => d,
+                    JsonElement { ValueKind: JsonValueKind.String } e when e.GetString()?.Equals("NaN", StringComparison.OrdinalIgnoreCase) == true => double.NaN,
+                    _ => throw new ArgumentException("Invalid value in Series Values.", nameof(series)),
+                };
 
-                object val;
-
-                if (jsonElementValue.TryGetInt32(out int i))
-                    val = i;
-                else if (jsonElementValue.TryGetDouble(out double d))
-                    val = d;
-                else if (jsonElementValue.TryGetInt64(out long l))
-                    val = l;
-                else
-                    val = jsonElementValue.ToString();
-
-                values.Add(val);
+                values.Add(value);
             }
 
             return values;
@@ -369,17 +362,14 @@ namespace SeriesServer.Controllers
         /// <summary>
         /// Represents a time series object
         /// </summary>
-        [JsonObject]
         public sealed class Series
         {
-            [JsonProperty]
+            [Required]
             public object[] Values { get; set; } = null!;
 
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public DateTime[]? Dates { get; set; }
 
             [Required]
-            [JsonProperty]
             public Dictionary<string, object> MetaData { get; set; } = null!;
 
             public Series() { }
@@ -396,58 +386,26 @@ namespace SeriesServer.Controllers
         /// Represents a list of time series result that is displayed in the data browser of the Macrobond application
         /// when selecting a node in the data tree.
         /// </summary>
-        [JsonObject]
-        public sealed class SeriesList
-        {
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public Aspect[]? Aspects { get; set; }
-
-            [Required]
-            [JsonProperty]
-            public Group[] Groups { get; set; }
-
-            public SeriesList(Aspect[]? aspects, Group[] groups)
-            {
-                Aspects = aspects;
-                Groups = groups;
-            }
-        }
+        public sealed record SeriesList(Aspect[]? Aspects, [property: Required] Group[] Groups);
 
         /// <summary>
         /// Represent an aspect tab the list of series that is displayed in the data browser of the Macrobond application
         /// when selecting a node in the data tree.
         /// </summary>
-        [JsonObject]
-        public sealed class Aspect
-        {
-            [JsonProperty]
-            public string Name { get; set; }
-
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public string Description { get; set; }
-
-            public Aspect(string name, string description)
-            {
-                Name = name;
-                Description = description;
-            }
-        }
+        public sealed record Aspect(string Name, string Description);
 
         /// <summary>
         /// Represent an group in the list of series that is displayed in the data browser of the Macrobond application
         /// when selecting a node in the data tree.
         /// </summary>
-        [JsonObject]
         public sealed class Group
         {
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string Name { get; set; }
 
             /// <summary>
             /// A list of series rows.
             /// </summary>
             [Required]
-            [JsonProperty]
             public SeriesRow[] Series { get; set; }
 
             public Group(string name, SeriesRow[] series)
@@ -461,26 +419,20 @@ namespace SeriesServer.Controllers
         /// A class that holds display options for a row of series as well as the MetaData of the series themselves.
         /// This is displayed in the data browser of the Macrobond application when selecting a node in the data tree.
         /// </summary>
-        [JsonObject]
         public sealed class SeriesRow
         {
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string Description { get; set; }
 
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public int? Indentation { get; set; }
 
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public bool? Emphasized { get; set; }
 
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public bool? SpaceAbove { get; set; }
 
             /// <summary>
             /// A dictionary of strings and object that holds the meta data of the time series in this row.
             /// </summary>
             [Required]
-            [JsonProperty]
             public IList<Dictionary<string, object>?> EntityMeta { get; set; } = null!;
 
             public string[] Names { get; set; }
@@ -500,46 +452,18 @@ namespace SeriesServer.Controllers
         /// Wraps a series so that the server can return a result.
         /// The result should be either a series in the Data field _or_ an error message in the Error field.
         /// </summary>
-        [JsonObject]
-        public class DownloadResult
+        public record DownloadResult(Series? Data, string? Error = null)
         {
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public Series? Data { get; }
-
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public string? Error { get; }
-
-            public DownloadResult(Series data, string? error = null)
-            {
-                Data = data;
-                Error = error;
-            }
             public DownloadResult(string error)
+                : this(null, error)
             {
-                Error = error;
             }
         }
 
         // Tells the client if this server has search and browse capabilities.
-        [JsonObject]
-        public struct Implements
-        {
-            [JsonProperty]
-            public bool Browse { get; set; }
-            [JsonProperty]
-            public bool Search { get; set; }
-            [JsonProperty]
-            public bool EditSeries { get; set; }
+        public record struct Implements(bool Browse, bool Search, bool EditSeries);
 
-            public Implements(bool browse, bool search, bool editSeries)
-            {
-                Browse = browse;
-                Search = search;
-                EditSeries = editSeries;
-            }
-        }
-
-        private static object m_lock = new object();
+        private static readonly object m_lock = new();
 
         // Sample data
 
