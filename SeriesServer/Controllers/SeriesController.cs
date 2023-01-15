@@ -677,7 +677,7 @@ namespace SeriesServer.Controllers
                 new Dictionary<string, object>
                 {
                     { "Description", "DateTime skip test" },
-                    { "Region", "mb" },
+                    { "Region", "us" },
                     { "StartDate", new DateTime(2017, 01, 01, 0, 0, 0) },
                     { "PrimName", "dt" },
                     { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
@@ -1041,7 +1041,7 @@ namespace SeriesServer.Controllers
                         new Group
                         (
                             string.Empty,
-                            new SeriesRow[0]
+                            Array.Empty<SeriesRow>()
                         )
                     }
                 )
