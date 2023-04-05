@@ -46,6 +46,8 @@ namespace SeriesServer.Controllers
 
         private static bool ImplementsRevisionsRelease => true;
 
+        private static bool ImplementsRevisionsCompleteHistory => true;
+
         /// <summary>
         /// Declare if this server support Browse, Search and Edit. This will enable features in the client application.
         /// </summary>
@@ -53,7 +55,7 @@ namespace SeriesServer.Controllers
         [HttpGet("getcapabilities")]
         public ActionResult<Implements> GetCapabilities()
         {
-            return new Implements(ImplementsBrowse, ImplementsSearch, ImplementsEditSeries, AllowMultipleSeriesPerRequest, ImplementsMeta, ImplementsRevisions, ImplementsRevisionsRelease);
+            return new Implements(ImplementsBrowse, ImplementsSearch, ImplementsEditSeries, AllowMultipleSeriesPerRequest, ImplementsMeta, ImplementsRevisions, ImplementsRevisionsRelease, ImplementsRevisionsCompleteHistory);
         }
 
         /// <summary>
@@ -168,6 +170,29 @@ namespace SeriesServer.Controllers
                 };
 
                 return result with { MetaData = meta };
+            }
+
+            return NotFound();
+        }
+
+        [HttpGet("completehistory")]
+        public ActionResult<Dictionary<DateTime, Series>> LoadCompleteHistory([Required][FromQuery(Name = "n")] string name)
+        {
+            if (name == "withrev")
+            {
+                Dictionary<DateTime, Series> result = new();
+                foreach (var (vintage, _, series) in WithRevSeriesVintages)
+                {
+                    var meta = new Dictionary<string, object>(WithRevMetaData)
+                    {
+                        { "RevisionSeriesType", "vintage" },
+                        { "RevisionTimeStamp", vintage },
+                    };
+
+                    result[vintage] = series with { MetaData = meta };
+                }
+
+                return result;
             }
 
             return NotFound();
@@ -556,7 +581,7 @@ namespace SeriesServer.Controllers
         public record Vintage(DateTime TimeStamp, string? Label);
 
         // Tells the client if this server has search and browse capabilities.
-        public record struct Implements(bool Browse, bool Search, bool EditSeries, bool AllowMultipleSeriesPerRequest, bool Meta, bool Revisions, bool RevisionsRelease);
+        public record struct Implements(bool Browse, bool Search, bool EditSeries, bool AllowMultipleSeriesPerRequest, bool Meta, bool Revisions, bool RevisionsRelease, bool RevisionsCompleteHistory);
 
         private static readonly object Lock = new();
 
