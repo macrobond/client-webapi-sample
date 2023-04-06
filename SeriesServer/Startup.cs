@@ -1,4 +1,4 @@
-﻿// Macrobond Financial AB 2020-2022
+﻿// Macrobond Financial AB 2020-2023
 
 using System;
 using System.IO;
