@@ -1,4 +1,4 @@
-﻿// Macrobond Financial AB 2020
+﻿// Macrobond Financial AB 2020-2023
 
 using System;
 using System.Net.Http.Headers;
