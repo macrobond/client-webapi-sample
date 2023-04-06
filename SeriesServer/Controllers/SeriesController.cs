@@ -146,7 +146,7 @@ namespace SeriesServer.Controllers
         /// <returns>List of vintages.</returns>
         /// <remarks>This method will only ever be called if the server has returned Revisions capability in GetCapabalities</remarks>
         [HttpGet("loadvintagetimestamps")]
-        public ActionResult<List<Vintage>> LoadVintageDates([Required][FromQuery(Name = "n")] string name)
+        public ActionResult<List<Vintage>> LoadVintageTimestamps([Required][FromQuery(Name = "n")] string name)
         {
             if (name == "withrev")
             {
