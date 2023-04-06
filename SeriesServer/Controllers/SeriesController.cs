@@ -1612,15 +1612,14 @@ namespace SeriesServer.Controllers
                 (
                     new Dictionary<string, object>()
                     {
-                        { "StartDate", new DateTime(2014, 01, 01, 0, 0, 0) },
                     },
                     new object[]
                     {
-                        5726277300, 6568862600, 5374127000, 5374127000
+                        6568862600, 5374127000, 5374127000
                     }, 
                     new DateTime[]
                     { 
-                        new DateTime(2014, 1, 1), new DateTime(2017, 1, 1), new DateTime(2018, 1, 1), new DateTime(2019, 1, 1)
+                        new DateTime(2017, 1, 1), new DateTime(2018, 1, 1), new DateTime(2019, 1, 1)
                     }
                 )
             ),
