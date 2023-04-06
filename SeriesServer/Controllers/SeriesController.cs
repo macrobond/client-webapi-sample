@@ -140,12 +140,12 @@ namespace SeriesServer.Controllers
         }
 
         /// <summary>
-        /// Returns a list of vintage dates with an optional label for each vintage.
+        /// Returns a list of vintage timestamps with an optional label for each vintage.
         /// </summary>
         /// <param name="name">Name of series to find.</param>
         /// <returns>List of vintages.</returns>
         /// <remarks>This method will only ever be called if the server has returned Revisions capability in GetCapabalities</remarks>
-        [HttpGet("loadvintagedates")]
+        [HttpGet("loadvintagetimestamps")]
         public ActionResult<List<Vintage>> LoadVintageDates([Required][FromQuery(Name = "n")] string name)
         {
             if (name == "withrev")
@@ -175,7 +175,7 @@ namespace SeriesServer.Controllers
             return NotFound();
         }
 
-        [HttpGet("completehistory")]
+        [HttpGet("loadcompletehistory")]
         public ActionResult<Dictionary<DateTime, Series>> LoadCompleteHistory([Required][FromQuery(Name = "n")] string name)
         {
             if (name == "withrev")
@@ -188,6 +188,9 @@ namespace SeriesServer.Controllers
                         { "RevisionSeriesType", "vintage" },
                         { "RevisionTimeStamp", vintage },
                     };
+
+                    foreach (var (k, v) in series.MetaData)
+                        meta[k] = v;
 
                     result[vintage] = series with { MetaData = meta };
                 }
@@ -1609,10 +1612,15 @@ namespace SeriesServer.Controllers
                 (
                     new Dictionary<string, object>()
                     {
+                        { "StartDate", new DateTime(2014, 01, 01, 0, 0, 0) },
                     },
                     new object[]
                     {
-                        5726277300, 6568862600, 5374127000
+                        5726277300, 6568862600, 5374127000, 5374127000
+                    }, 
+                    new DateTime[]
+                    { 
+                        new DateTime(2014, 1, 1), new DateTime(2017, 1, 1), new DateTime(2018, 1, 1), new DateTime(2019, 1, 1)
                     }
                 )
             ),
