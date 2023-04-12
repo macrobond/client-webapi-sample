@@ -11,7 +11,7 @@ By implementing the Web Provider API in your service, the Macrobond Application 
 You can find the documentation of the API [here](https://help.macrobond.com/technical-information/the-macrobond-web-api-provider/).
 
 ## Building the server
-The sample is using .NET Core 3.1. You can find more information and download the SDK at the [Microsoft site](https://dotnet.microsoft.com/download/dotnet-core)
+The sample is using .NET 6. You can find more information and download the SDK at the [Microsoft site](https://dotnet.microsoft.com/download/dotnet-core)
 
 To download the source code for the sample server, you can use a git command
 ```bash
