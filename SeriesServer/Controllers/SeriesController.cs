@@ -176,11 +176,11 @@ namespace SeriesServer.Controllers
         }
 
         [HttpGet("loadcompletehistory")]
-        public ActionResult<Dictionary<DateTime, Series>> LoadCompleteHistory([Required][FromQuery(Name = "n")] string name)
+        public ActionResult<List<Series>> LoadCompleteHistory([Required][FromQuery(Name = "n")] string name)
         {
             if (name == "withrev")
             {
-                Dictionary<DateTime, Series> result = new();
+                List<Series> result = new();
                 foreach (var (vintage, _, series) in WithRevSeriesVintages)
                 {
                     var meta = new Dictionary<string, object>(WithRevMetaData)
@@ -192,7 +192,7 @@ namespace SeriesServer.Controllers
                     foreach (var (k, v) in series.MetaData)
                         meta[k] = v;
 
-                    result[vintage] = series with { MetaData = meta };
+                    result.Add(series with { MetaData = meta });
                 }
 
                 return result;
