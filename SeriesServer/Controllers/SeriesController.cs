@@ -802,6 +802,8 @@ namespace SeriesServer.Controllers
                     { "Description", "DateTime skip test" },
                     { "Region", "us" },
                     { "StartDate", new DateTime(2017, 01, 01, 0, 0, 0) },
+                    { "Frequency", "daily" },
+                    { "DayMask", "FullWeek" },
                     { "PrimName", "dt" },
                     { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
