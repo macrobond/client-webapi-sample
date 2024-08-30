@@ -1,14 +1,14 @@
-﻿// Macrobond Financial AB 2020-2023
+﻿// Macrobond Financial AB 2020
 
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Data;
 using System.Linq;
 using System.Net;
 using System.Text.Json;
 
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 
 #nullable enable
 
@@ -38,16 +38,6 @@ namespace SeriesServer.Controllers
 
         private static bool ImplementsSearch => true;
 
-        private static bool AllowMultipleSeriesPerRequest => true;
-
-        private static bool ImplementsMeta => true;
-
-        private static bool ImplementsRevisions => true;
-
-        private static bool ImplementsRevisionsRelease => true;
-
-        private static bool ImplementsRevisionsCompleteHistory => true;
-
         /// <summary>
         /// Declare if this server support Browse, Search and Edit. This will enable features in the client application.
         /// </summary>
@@ -55,32 +45,7 @@ namespace SeriesServer.Controllers
         [HttpGet("getcapabilities")]
         public ActionResult<Implements> GetCapabilities()
         {
-            return new Implements(ImplementsBrowse, ImplementsSearch, ImplementsEditSeries, AllowMultipleSeriesPerRequest, ImplementsMeta, ImplementsRevisions, ImplementsRevisionsRelease, ImplementsRevisionsCompleteHistory);
-        }
-
-        /// <summary>
-        /// Returns metadata for one or more series identified by a list of names.
-        /// </summary>
-        /// <param name="names">Names of series to find.</param>
-        /// <returns>List of metadata for series.</returns>
-        /// <remarks>This method will only ever be called if the server has returned Meta capability in GetCapabilities</remarks>
-        [HttpGet("loadmeta")]
-        public ActionResult<List<DownloadResult<Entity>>> LoadMeta([Required][FromQuery(Name = "n")] string[] names)
-        {
-            var listToReturn = names.Select(LoadSeriesInternal).ToList();
-
-            if (listToReturn.Any())
-                return listToReturn;
-
-            return NotFound();
-
-            DownloadResult<Entity> LoadSeriesInternal(string name)
-            {
-                Series? series = LoadSeriesCore(name);
-                if (series == null)
-                    return new DownloadResult<Entity>("Series could not be found!");
-                return new DownloadResult<Entity>(new Entity(series.MetaData));
-            }
+            return new Implements(ImplementsBrowse, ImplementsSearch, ImplementsEditSeries);
         }
 
         /// <summary>
@@ -90,7 +55,7 @@ namespace SeriesServer.Controllers
         /// <returns>List of series.</returns>
         /// <remarks>This method must always be implemented.</remarks>
         [HttpGet("loadseries")]
-        public ActionResult<List<DownloadResult<Series>>> LoadSeries([Required][FromQuery(Name = "n")] string[] names)
+        public ActionResult<List<DownloadResult>> LoadSeries([Required][FromQuery(Name = "n")] string[] names)
         {
             var listToReturn = names.Select(LoadSeriesInternal).ToList();
 
@@ -99,363 +64,29 @@ namespace SeriesServer.Controllers
 
             return NotFound();
 
-            DownloadResult<Series> LoadSeriesInternal(string name)
+            DownloadResult LoadSeriesInternal(string name)
             {
                 Series? series = LoadSeriesCore(name);
-
                 if (series == null)
-                    return new DownloadResult<Series>("Series could not be found!");
-                // series.Values = series.Values.Reverse().ToArray();
-                // series.MetaData[LastModifiedTimeStamp] = DateTime.Now;
-                return new DownloadResult<Series>(series);
+                    return new DownloadResult("Series could not be found!");
+                series.Values = series.Values.Reverse().ToArray();
+                series.MetaData[LastModifiedTimeStamp] = DateTime.Now;
+                return new DownloadResult(series);
             }
         }
 
         /// <summary>
-        /// Returns one or more series identified by a list of names.
+        /// Creaste or replace a series.
         /// </summary>
-        /// <param name="name">Name of series to find.</param>
-        /// <param name="timestamp">The vintage timestamp.</param>
-        /// <returns>List of series.</returns>
-        /// <remarks>This method will only ever be called if the server has returned Revisions capability in GetCapabalities</remarks>
-        [HttpGet("loadvintage")]
-        public ActionResult<Series> LoadVintage([Required][FromQuery(Name = "n")] string name, [Required][FromQuery] DateTimeOffset timestamp)
-        {
-            if (name == "withrev")
-            {
-                var result = WithRevSeriesVintages.OrderBy(p => p.Vintage).Where(p => p.Vintage <= timestamp).LastOrDefault();
-                if (result.Series == null)
-                    result = WithRevSeriesVintages[0];
-
-                var meta = new Dictionary<string, object>(WithRevMetaData)
-                {
-                    { "RevisionSeriesType", "vintage" },
-                    { "RevisionTimeStamp", result.Vintage },
-                };
-
-                return result.Series with { MetaData = meta };
-            }
-
-            return NotFound();
-        }
-
-        /// <summary>
-        /// Returns a list of vintage timestamps with an optional label for each vintage.
-        /// </summary>
-        /// <param name="name">Name of series to find.</param>
-        /// <returns>List of vintages.</returns>
-        /// <remarks>This method will only ever be called if the server has returned Revisions capability in GetCapabalities</remarks>
-        [HttpGet("loadvintagetimestamps")]
-        public ActionResult<List<Vintage>> LoadVintageTimestamps([Required][FromQuery(Name = "n")] string name)
-        {
-            if (name == "withrev")
-            {
-                return WithRevSeriesVintages.Select(p => new Vintage(p.Vintage, p.Label)).ToList();
-            }
-
-            return NotFound();
-        }
-
-        [HttpGet("loadrelease")]
-        public ActionResult<Series> LoadRelease([Required][FromQuery(Name = "n")] string name, [Required][FromQuery] int nthrelease)
-        {
-            if (name == "withrev")
-            {
-                var result = nthrelease < WithRevSeriesReleases.Count ? WithRevSeriesReleases[nthrelease] : WithRevSeriesReleases[^1];
-
-                var meta = new Dictionary<string, object>(WithRevMetaData)
-                {
-                    { "RevisionSeriesType", "nth" },
-                    { "RevisionSeriesNth", nthrelease },
-                };
-
-                return result with { MetaData = meta };
-            }
-
-            return NotFound();
-        }
-
-        [HttpGet("loadcompletehistory")]
-        public ActionResult<List<Series>> LoadCompleteHistory([Required][FromQuery(Name = "n")] string name)
-        {
-            if (name == "withrev")
-            {
-                List<Series> result = new();
-                foreach (var (vintage, _, series) in WithRevSeriesVintages)
-                {
-                    var meta = new Dictionary<string, object>(WithRevMetaData)
-                    {
-                        { "RevisionSeriesType", "vintage" },
-                        { "RevisionTimeStamp", vintage },
-                    };
-
-                    foreach (var (k, v) in series.MetaData)
-                        meta[k] = v;
-
-                    result.Add(series with { MetaData = meta });
-                }
-
-                return result;
-            }
-
-            return NotFound();
-        }
-
-        /// <summary>
-        /// Create or replace a series.
-        /// </summary>
-        /// <param name="series">The series data including values, dates and metadat.</param>
-        /// <param name="lastModified">Included when a series is replaced. This is the timestamp returned from the previous call to this method or LoadSeries. Typically the save operation fails if this does not match the stored series.</param>
-        /// <param name="forceReplace">Replace series even if lastModified timestamp is not specified or not matching.</param>
+        /// <param name="series">The series data including values, dates and metadata.</param>
+        /// <param name="lastModified">Included when a series is replaced. This is the timestamp returned from the previous call to this method or LoadSeries. Typically the save operation fails if this does not match the strored series.</param>
         /// <returns>The timestamp when the series was stored.</returns>
         /// <remarks>This method will only ever be called if the server has returned EditSeries capability in GetCapabalities</remarks>
         [HttpPost("createseries")]
-        public ActionResult<DateTime> CreateSeries([FromBody] Series series, [FromQuery] DateTime? lastModified, [FromQuery] bool? forceReplace)
+        public ActionResult<DateTime> CreateSeries([FromBody] Series series, [FromQuery] DateTime? lastModified)
         {
-            Dictionary<string, object> meta = DeserializeMetaData(series);
-            List<object> values = DeserializeValues(series);
+            // Convert the values to the expected types
 
-            Series newSeries = new Series(meta, values.ToArray(), series.Dates);
-
-            string name = (string)meta["PrimName"];
-
-            if (name == "withrev")
-                return BadRequest();
-
-            var now = DateTime.Now;
-            meta[LastModifiedTimeStamp] = now;
-
-            lock (Lock)
-            {
-                int index = Database.FindIndex(s => (string)s.MetaData["PrimName"] == name);
-
-                if (index >= 0)
-                {
-                    // This series is already in the database. Check that it matches the same timestamp of the input series.
-                    var item = Database[index];
-                    if ((string)item.MetaData["PrimName"] == name)
-                    {
-                        if (forceReplace == true)
-                        {
-                            Database[index] = newSeries;
-                            return Ok(now);
-                        }
-
-                        if (lastModified is null)
-                            return Conflict("Series with that name already exists");
-
-                        var oldDt = (DateTime)item.MetaData[LastModifiedTimeStamp];
-                        if (lastModified == oldDt)
-                        {
-                            Database[index] = newSeries;
-                            return Ok(now);
-                        }
-                        else
-                            return Conflict("LastModified does not match");
-                    }
-                }
-
-                if (lastModified != null || forceReplace == true)
-                    NotFound();
-
-                // Just add to the list returned when browsing
-
-                Database.Add(newSeries);
-                foreach (var p in SeriesMetaData)
-                {
-                    if (p.Key == "Other")
-                    {
-                        var seriesRowList = p.Value.Groups[0].Series.ToList();
-                        seriesRowList.Add(new SeriesRow(name, 0, false, false, new[] { name }));
-                        p.Value.Groups[0].Series = seriesRowList.ToArray();
-                    }
-                }
-            }
-
-            return Ok(now);
-        }
-
-        /// <summary>
-        /// Removes a series from the database.
-        /// </summary>
-        /// <param name="name">Names of the series to be removed.</param>
-        /// <returns>Returns 404 if series could not be found.</returns>
-        /// <remarks>This method will only ever be called if the server has returned EditSeries capability in GetCapabalities</remarks>
-        [HttpGet("removeseries")]
-        public ActionResult RemoveSeries([Required][FromQuery(Name = "n")] string name)
-        {
-            bool found;
-            lock (Lock)
-            {
-                int index = Database.FindIndex(s => name == (string)s.MetaData["PrimName"]);
-
-                if (index >= 0)
-                {
-                    Database.RemoveAt(index);
-                    found = true;
-                }
-                else
-                    found = false;
-
-                // Also remove from our internal list of series
-
-                foreach (var p in SeriesMetaData)
-                {
-                    foreach (var g in p.Value.Groups)
-                    {
-                        (int x, int y)? removeAt = null;
-                        for (int x = 0; x < g.Series.Length; x++)
-                        {
-                            for (int y = 0; y < g.Series[x].Names.Length; y++)
-                            {
-                                if (g.Series[x].Names[y] == name)
-                                    removeAt = (x, y);
-                            }
-                        }
-
-                        if (removeAt != null)
-                        {
-                            var list = g.Series[removeAt.Value.x].Names.ToList();
-                            list.RemoveAt(removeAt.Value.y);
-                            g.Series[removeAt.Value.x].Names = list.ToArray();
-                            if (g.Series[removeAt.Value.x].Names.Length == 0)
-                            {
-                                var sList = g.Series.ToList();
-                                sList.RemoveAt(removeAt.Value.x);
-                                g.Series = sList.ToArray();
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (found)
-                return Ok();
-            return NotFound();
-        }
-
-        /// <summary>
-        /// Used for getting LastModified from series when editing. 
-        /// </summary>
-        private readonly string LastModifiedTimeStamp = "LastModifiedTimeStamp";
-
-        /// <summary>
-        /// Helper function for getting series from internal memory db.
-        /// </summary>
-        /// <param name="name">Name of series.</param>
-        /// <returns>Requested series of null if no series with that name could be found.</returns>
-        private Series? LoadSeriesCore(string name)
-        {
-            lock (Lock)
-            {
-                return name switch
-                {
-                    "withrev" => WithRevSeriesVintages[^1].Series with { MetaData = WithRevMetaData },
-                    _ => Database.FirstOrDefault(s => string.Compare((string)s.MetaData["PrimName"], name, StringComparison.OrdinalIgnoreCase) == 0),
-                };
-            }
-        }
-
-        /// <summary>
-        /// Loads part of or a complete database tree.
-        /// </summary>
-        /// <param name="reference">Loads the part of the tree referenced, or the root of the tree if no reference is specified.</param>
-        /// <returns>A list of tree nodes. A node may contain nested nodes, nested node branch references or nested series list references.</returns>
-        /// <remarks>This method will only ever be called if the server has returned Browse capability in GetCapabalities</remarks>
-        [HttpGet("loadtree")]
-        public ActionResult<List<object>> LoadTree([FromQuery] string? reference)
-        {
-            lock (Lock)
-            {
-                if (string.IsNullOrWhiteSpace(reference))
-                    return BrowseDataBase[string.Empty];
-
-                if (BrowseDataBase.TryGetValue(reference, out List<object>? value))
-                    return value;
-            }
-
-            return NotFound();
-        }
-
-
-        /// <summary>
-        /// Lists all series in the current leaf node.
-        /// </summary>
-        /// <param name="reference">Name of the branch to list from.</param>
-        /// <remarks>This method will only ever be called if the server has returned Browse capability in GetCapabalities</remarks>
-        [ProducesResponseType(typeof(SeriesList), (int)HttpStatusCode.OK)]
-        [HttpGet("listseries")]
-        public ActionResult<SeriesList> ListSeries([Required][FromQuery] string reference)
-        {
-            lock (Lock)
-            {
-                if (!string.IsNullOrWhiteSpace(reference) && SeriesMetaData.TryGetValue(reference, out SeriesList? value))
-                {
-                    foreach (var group in value.Groups)
-                    {
-                        foreach (var seriesRow in group.Series)
-                        {
-                            var series = new List<Series>(seriesRow.Names.Length);
-                            foreach (var entityName in seriesRow.Names)
-                                series.Add(LoadSeriesCore(entityName)!);
-
-                            seriesRow.EntityMeta = series.Select(x => x is null || x.MetaData is null ? null : x.MetaData).ToArray(); ;
-                        }
-                    }
-                    return value;
-                }
-            }
-
-            return NotFound();
-        }
-
-
-        /// <summary>
-        /// Finds and returns a time series from the server by text search.
-        /// </summary>
-        /// <remarks>This method will only ever be called if the server has returned Search capability in GetCapabalities</remarks>
-        [HttpGet("searchseries")]
-        public ActionResult<IEnumerable<Dictionary<string, object>>> SearchSeries([Required][FromQuery] string query)
-        {
-            // In this sample code we just look for matching text in the description of the series. What the query means is up to the implementation, but it is typically interpreted as a set of words to search for.
-
-            List<Dictionary<string, object>> list = new List<Dictionary<string, object>>();
-
-            lock (Lock)
-            {
-                foreach (var result in Database)
-                {
-                    if (result.MetaData["Description"] is string name && name.Contains(query, StringComparison.OrdinalIgnoreCase))
-                        list.Add(result.MetaData);
-                }
-            }
-
-            if (list.Count != 0)
-                return list;
-
-            return NotFound();
-        }
-
-        private static List<object> DeserializeValues(Series series)
-        {
-            List<object> values = new List<object>();
-            foreach (var x in series.Values)
-            {
-                object value = x switch
-                {
-                    JsonElement { ValueKind: JsonValueKind.Number } e when e.TryGetDouble(out var d) => d,
-                    JsonElement { ValueKind: JsonValueKind.String } e when e.GetString()?.Equals("NaN", StringComparison.OrdinalIgnoreCase) == true => double.NaN,
-                    _ => throw new ArgumentException("Invalid value in Series Values.", nameof(series)),
-                };
-
-                values.Add(value);
-            }
-
-            return values;
-        }
-
-        private static Dictionary<string, object> DeserializeMetaData(Series series)
-        {
             Dictionary<string, object> meta = new Dictionary<string, object>();
             foreach (var x in series.MetaData)
             {
@@ -492,40 +123,294 @@ namespace SeriesServer.Controllers
                 meta.Add(x.Key, val);
             }
 
-            return meta;
+            DateTime now = DateTime.UtcNow;
+            meta["LastModifiedTimeStamp"] = now;
+
+            Series newSeries = new Series(meta, series.Values, series.Dates);
+
+            string name = (string)newSeries.MetaData["PrimName"];
+
+            lock (m_lock)
+            {
+                int index = m_dataBase.FindIndex(s => (string)s.MetaData["PrimName"] == name);
+
+                if (index >= 0)
+                {
+                    // This series is already in the database. Check that it matches the same timestamp of the input series.
+                    var item = m_dataBase[index];
+                    if ((string)item.MetaData["PrimName"] == name)
+                    {
+                        if (lastModified is null)
+                            return Conflict("Series with that name already exists");
+
+                        var oldDt = (DateTime)item.MetaData[LastModifiedTimeStamp];
+                        if (lastModified == oldDt)
+                        {
+                            m_dataBase[index] = newSeries;
+                            return (DateTime)item.MetaData[LastModifiedTimeStamp];
+                        }
+                        else
+                            return Conflict("LastModified does not match!");
+                    }
+                }
+
+                if (lastModified != null)
+                    NotFound();
+
+                // Just add to the list returned when browsing
+
+                m_dataBase.Add(newSeries);
+                foreach (var p in m_seriesMetaData)
+                {
+                    if (p.Key == "Other")
+                    {
+                        var seriesRowList = p.Value.Groups[0].Series.ToList();
+                        seriesRowList.Add(new SeriesRow(name, 0, false, false, [name]));
+                        p.Value.Groups[0].Series = seriesRowList.ToArray();
+                    }
+                }
+            }
+
+            return now;
         }
 
-        public sealed record Entity(Dictionary<string, object> MetaData);
+        /// <summary>
+        /// Removes a series from the database.
+        /// </summary>
+        /// <param name="name">Name of ther series to be removed.</param>
+        /// <returns>Returns 404 if series could not be found.</returns>
+        /// <remarks>This method will only ever be called if the server has returned EditSeries capability in GetCapabalities</remarks>
+        [HttpPost("removeseries")]
+        public ActionResult RemoveSeries([FromBody] string name)
+        {
+            bool found;
+            lock (m_lock)
+            {
+                int index = m_dataBase.FindIndex(s => name == (string)s.MetaData["PrimName"]);
+
+                if (index >= 0)
+                {
+                    m_dataBase.RemoveAt(index);
+                    found = true;
+                }
+                else
+                    found = false;
+
+                // Also remove from our internal list of series
+
+                foreach (var p in m_seriesMetaData)
+                {
+                    foreach (var g in p.Value.Groups)
+                    {
+                        (int x, int y)? removeAt = null;
+                        for (int x = 0; x < g.Series.Length; x++)
+                        {
+                            for (int y = 0; y < g.Series[x].Names.Length; y++)
+                            {
+                                if (g.Series[x].Names[y] == name)
+                                    removeAt = (x, y);
+                            }
+                        }
+
+                        if (removeAt != null)
+                        {
+                            var list = g.Series[removeAt.Value.x].Names.ToList();
+                            list.RemoveAt(removeAt.Value.y);
+                            g.Series[removeAt.Value.x].Names = list.ToArray();
+                            if (g.Series[removeAt.Value.x].Names.Length == 0)
+                            {
+                                var sList = g.Series.ToList();
+                                sList.RemoveAt(removeAt.Value.x);
+                                g.Series = sList.ToArray();
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (found)
+                    return Ok();
+                return NotFound();
+        }
+
+        /// <summary>
+        /// Used for getting LastModified from series when editing. 
+        /// </summary>
+        private readonly string LastModifiedTimeStamp = "LastModifiedTimeStamp";
+
+        /// <summary>
+        /// Helper function for getting series from internal memory db.
+        /// </summary>
+        /// <param name="name">Name of series.</param>
+        /// <returns>Requested series of null if no series with that name could be found.</returns>
+        private Series? LoadSeriesCore(string name)
+        {
+            lock (m_lock)
+                return m_dataBase.FirstOrDefault(s => string.Compare((string)s.MetaData["PrimName"], name, StringComparison.OrdinalIgnoreCase) == 0);
+        }
+
+        /// <summary>
+        /// Loads part of or a complete database tree.
+        /// </summary>
+        /// <param name="reference">Loads the part of the tree referenced, or the root of the tree if no reference is specified.</param>
+        /// <returns>A list of tree nodes. A node may contain nested nodes, nested node branch references or nested series list references.</returns>
+        /// <remarks>This method will only ever be called if the server has returned Browse capability in GetCapabalities</remarks>
+        [HttpGet("loadtree")]
+        public ActionResult<List<object>> LoadTree([FromQuery] string? reference)
+        {
+            lock (m_lock)
+            {
+                if (string.IsNullOrWhiteSpace(reference))
+                    return m_browseDataBase[string.Empty];
+
+                if (m_browseDataBase.TryGetValue(reference, out List<object>? value))
+                    return value;
+            }
+
+            return NotFound();
+        }
+
+
+        /// <summary>
+        /// Lists all series in the current leaf node.
+        /// </summary>
+        /// <param name="reference">Name of the branch to list from.</param>
+        /// <remarks>This method will only ever be called if the server has returned Browse capability in GetCapabalities</remarks>
+        [ProducesResponseType(typeof(SeriesList), (int)HttpStatusCode.OK)]
+        [HttpGet("listseries")]
+        public ActionResult<SeriesList> ListSeries([Required][FromQuery] string reference)
+        {
+            lock (m_lock)
+            {
+                if (!string.IsNullOrWhiteSpace(reference) && m_seriesMetaData.TryGetValue(reference, out SeriesList? value))
+                {
+                    foreach (var group in value.Groups)
+                    {
+                        foreach (var seriesRow in group.Series)
+                        {
+                            var series = new List<Series?>(seriesRow.Names.Length);
+                            foreach (var entityName in seriesRow.Names)
+                                series.Add(LoadSeriesCore(entityName));
+
+                            seriesRow.EntityMeta = series.Select(x => x is null || x.MetaData is null ? null : x.MetaData).ToArray(); ;
+                        }
+                    }
+                    return value;
+                }
+            }
+
+            return NotFound();
+        }
+
+
+        /// <summary>
+        /// Finds and returns a time series from the server by text search.
+        /// </summary>
+        /// <remarks>This method will only ever be called if the server has returned Search capability in GetCapabalities</remarks>
+        [HttpGet("searchseries")]
+        public ActionResult<IEnumerable<Dictionary<string, object>>> SearchSeries([Required][FromQuery] string query)
+        {
+            // In this sample code we just look for matching text in the description of the series. What the query means is up to the implementation, but it is typically interpreted as a set of words to search for.
+
+            List<Dictionary<string, object>> list = new List<Dictionary<string, object>>();
+
+            lock (m_lock)
+            {
+                foreach (var result in m_dataBase)
+                {
+                    if (result.MetaData["Description"] is string name && name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                        list.Add(result.MetaData);
+                }
+            }
+
+            if (list.Count != 0)
+                return list;
+
+            return NotFound();
+        }
 
         /// <summary>
         /// Represents a time series object
         /// </summary>
-        public sealed record Series([property: Required] Dictionary<string, object> MetaData, [property: Required] object[] Values, DateTime[]? Dates = null, Dictionary<string, object>?[]? PerValueMetaData = null);
+        [JsonObject]
+        public sealed class Series
+        {
+            [JsonProperty]
+            public double[] Values { get; set; } = null!;
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public DateTime[]? Dates { get; set; }
+
+            [Required]
+            [JsonProperty]
+            public Dictionary<string, object> MetaData { get; set; } = null!;
+
+            public Series() { }
+
+            public Series(Dictionary<string, object> metaData, double[] values, DateTime[]? dates = null)
+            {
+                Values = values;
+                MetaData = metaData;
+                Dates = dates;
+            }
+        }
 
         /// <summary>
         /// Represents a list of time series result that is displayed in the data browser of the Macrobond application
         /// when selecting a node in the data tree.
         /// </summary>
-        public sealed record SeriesList(Aspect[]? Aspects, [property: Required] Group[] Groups);
+        [JsonObject]
+        public sealed class SeriesList
+        {
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public Aspect[]? Aspects { get; set; }
+
+            [Required]
+            [JsonProperty]
+            public Group[] Groups { get; set; }
+
+            public SeriesList(Aspect[]? aspects, Group[] groups)
+            {
+                Aspects = aspects;
+                Groups = groups;
+            }
+        }
 
         /// <summary>
         /// Represent an aspect tab the list of series that is displayed in the data browser of the Macrobond application
         /// when selecting a node in the data tree.
         /// </summary>
-        public sealed record Aspect(string Name, string Description);
+        [JsonObject]
+        public sealed class Aspect
+        {
+            [JsonProperty]
+            public string Name { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string Description { get; set; }
+
+            public Aspect(string name, string description)
+            {
+                Name = name;
+                Description = description;
+            }
+        }
 
         /// <summary>
         /// Represent an group in the list of series that is displayed in the data browser of the Macrobond application
         /// when selecting a node in the data tree.
         /// </summary>
+        [JsonObject]
         public sealed class Group
         {
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string Name { get; set; }
 
             /// <summary>
             /// A list of series rows.
             /// </summary>
             [Required]
+            [JsonProperty]
             public SeriesRow[] Series { get; set; }
 
             public Group(string name, SeriesRow[] series)
@@ -539,20 +424,26 @@ namespace SeriesServer.Controllers
         /// A class that holds display options for a row of series as well as the MetaData of the series themselves.
         /// This is displayed in the data browser of the Macrobond application when selecting a node in the data tree.
         /// </summary>
+        [JsonObject]
         public sealed class SeriesRow
         {
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string Description { get; set; }
 
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public int? Indentation { get; set; }
 
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public bool? Emphasized { get; set; }
 
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public bool? SpaceAbove { get; set; }
 
             /// <summary>
             /// A dictionary of strings and object that holds the meta data of the time series in this row.
             /// </summary>
             [Required]
+            [JsonProperty]
             public IList<Dictionary<string, object>?> EntityMeta { get; set; } = null!;
 
             public string[] Names { get; set; }
@@ -572,38 +463,65 @@ namespace SeriesServer.Controllers
         /// Wraps a series so that the server can return a result.
         /// The result should be either a series in the Data field _or_ an error message in the Error field.
         /// </summary>
-        public record DownloadResult<T>(T? Data, string? Error = null)
-            where T : class
+        [JsonObject]
+        public class DownloadResult
         {
-            public DownloadResult(string error)
-                : this(null, error)
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public Series? Data { get; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string? Error { get; }
+
+            public DownloadResult(Series data, string? error = null)
             {
+                Data = data;
+                Error = error;
+            }
+            public DownloadResult(string error)
+            {
+                Error = error;
             }
         }
 
-        public record Vintage(DateTime TimeStamp, string? Label);
-
         // Tells the client if this server has search and browse capabilities.
-        public record struct Implements(bool Browse, bool Search, bool EditSeries, bool AllowMultipleSeriesPerRequest, bool Meta, bool Revisions, bool RevisionsRelease, bool RevisionsCompleteHistory);
+        [JsonObject]
+        public struct Implements
+        {
+            [JsonProperty]
+            public bool Browse { get; set; }
+            [JsonProperty]
+            public bool Search { get; set; }
+            [JsonProperty]
+            public bool EditSeries { get; set; }
 
-        private static readonly object Lock = new();
+            public Implements(bool browse, bool search, bool editSeries)
+            {
+                Browse = browse;
+                Search = search;
+                EditSeries = editSeries;
+            }
+        }
+
+        private static object m_lock = new object();
 
         // Sample data
 
-        private static readonly List<Series> Database = new List<Series>
+        private static List<Series> m_dataBase = new List<Series>
         {
             new Series
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Arrivals, Total" },
+                    { "Description", "Total" },
                     { "Region", new string[] { "pl", "se"} },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2003, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltour0001" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
+                    { "LastModifiedTimeStamp", new DateTime(2003, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     4319590.0d, 4059520.0d, 3605839.0d, 3280645.0d, 2460560.0d, 2401899.0d, 2187680.0d, 2124118.0d, 2194190.0d, 2436125.0d, 2863790.0d, 3267168.0d, 4067560.0d, 3926772.0d, 3389729.0d,
                     3012555.0d, 2467756.0d, 2205113.0d, 2045505.0d, 2019667.0d, 2116904.0d, 2273641.0d, 2671256.0d, 3123243.0d, 3803479.0d, 3755086.0d, 3250518.0d, 2847226.0d, 2285368.0d, 2107293.0d,
@@ -625,14 +543,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Domestic Trade, Wholesale Trade" },
+                    { "Description", "Other" },
                     { "Region", "pl" },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2004, 11, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0021" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     105.6, 99.8, 106.1, 93.9, 107.3, 109, 104.1, 107.2, 105.3, 99.2, 98.3, 103.9, 98.3, 103.1, 105.5, 105.6, 101, 104.8, 96.6, 101.7, 103.2, 97.5, 106, 110.3, 103.5, 103.4, 104.2,
                     100.8, 109.8, 97.8, 109.5, 99.5, 113.1, 105.5, 108.5, 102.6, 104.8, 114.4, 103, 115.6, 109.1, 106.8, 102.6, 104.4, 95.2, 100.1, 101.7, 93.9, 98, 93.6, 94.8, 93.4, 86, 100.4, 106.7,
@@ -647,14 +566,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Domestic Trade, Food" },
+                    { "Description", "Food" },
                     { "Region", "pl" },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2002, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0014" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     117.1, 112.3, 116.3, 104.2, 110.9, 121.6, 99.8, 109.4, 108.7, 105.5, 108.8, 114.2, 104.6, 109.5, 107.7, 105.4, 108.8, 107.9, 108.6, 111, 112.2, 110.9, 120, 121, 117.8, 124.2, 124,
                     128.5, 127.2, 124.2, 126.9, 116.6, 129, 107.9, 112.6, 106.2, 106.7, 108.3, 101, 103.6, 104.1, 103.7, 101.7, 107.6, 99.2, 108.1, 108.4, 103.8, 110.9, 98.3, 94.4, 97.5, 95.3, 89.6,
@@ -670,14 +590,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Domestic Trade, New Passenger Car" },
+                    { "Description", "New Passenger Car" },
                     { "Region", "pl" },
+                    { "Source", "src_ecb" },
                     { "StartDate", new DateTime(2003, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "ecb_stsmplwcregpc00003abs" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     36179, 48945, 48034, 48014, 46473, 46133, 52224, 44408, 45141, 48248, 41836, 39173, 28955, 55731, 46904, 45846, 43263, 46041, 52013, 42755, 45292, 51034, 40990, 41158, 38009,
                     33915, 38634, 41668, 39192, 42074, 48070, 38992, 38739, 43374, 37240, 33914, 32308, 27838, 32792, 37050, 33676, 34334, 39490, 32999, 34662, 35804, 30355, 29529, 26967, 23969,
@@ -694,14 +615,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Foreign Trade, Export, United States" },
-                    { "Region", "pl" },
+                    { "Description", "Total" },
+                    { "Region", "se" },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2005, 01, 01, 0, 0, 0) },
                     { "Frequency", "annual" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0135" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     26200000000, 23367941400, 18859110800, 16841434600, 15174652800, 15239242500, 11754934900, 10879093500, 8761157500, 7639377800, 5907934000, 5726277300, 6568862600, 5974127000,
                 }
@@ -710,14 +632,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Foreign Trade, Import, United States" },
-                    { "Region", "pl" },
+                    { "Description", "Total" },
+                    { "Region", "se" },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2005, 01, 01, 0, 0, 0) },
                     { "Frequency", "annual" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0131" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     27600000000, 25027500000, 22135300000, 19773500000, 17168200000, 17430700000, 16579900000, 14139100000, 13560300000, 10722000000, 10975000000, 9621600000, 8688200000, 7819500000,
                 }
@@ -726,14 +649,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Foreign Trade, Trade Balance" },
+                    { "Description", "Total" },
                     { "Region", "pl" },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0051" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
                     103487700000, 88747800000, 74297800000, 58215300000, 42986600000, 29336400000, 15848200000, 168644000000, 160453000000, 144431700000, 128103300000, 111922200000, 97781700000,
@@ -763,14 +687,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Domestic Trade, Wholesale Trade" },
+                    { "Description", "Total" },
                     { "Region", "se" },
+                    { "Source", "src_sescb" },
                     { "StartDate", new DateTime(2000, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
-                    { "CalAdj", "ca" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad2195" },
                 },
-                new object[]
+                new double[]
                 {
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
                     103487700000, 88747800000, 74297800000, 58215300000, 42986600000, 29336400000, 15848200000, 168644000000, 160453000000, 144431700000, 128103300000, 111922200000, 97781700000,
@@ -800,14 +725,13 @@ namespace SeriesServer.Controllers
                 new Dictionary<string, object>
                 {
                     { "Description", "DateTime skip test" },
-                    { "Region", "us" },
+                    { "Region", "mb" },
+                    { "Source", "me" },
                     { "StartDate", new DateTime(2017, 01, 01, 0, 0, 0) },
-                    { "Frequency", "daily" },
-                    { "DayMask", "FullWeek" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "dt" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     5, 4, 3, 4,
                     5, 4, 3, 4,
@@ -824,14 +748,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
-                    { "Description", "Domestic Trade, Wholesale Trade" },
+                    { "Description", "Total, Goods" },
                     { "Region", "se" },
+                    { "Source", "src_sescb" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad2136" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
                     103487700000, 88747800000, 74297800000, 58215300000, 42986600000, 29336400000, 15848200000, 168644000000, 160453000000, 144431700000, 128103300000, 111922200000, 97781700000,
@@ -861,14 +786,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
-                    { "Description", "Domestic Trade except of Motor Vehicles" },
+                    { "Description", "Total, except of Motor Vehicles" },
                     { "Region", "se" },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad2128" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
                     103487700000, 88747800000, 74297800000, 58215300000, 42986600000, 29336400000, 15848200000, 168644000000, 160453000000, 144431700000, 128103300000, 111922200000, 97781700000,
@@ -900,12 +826,13 @@ namespace SeriesServer.Controllers
                 {
                     { "Description", "New Passenger Car" },
                     { "Region", "se" },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1990, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "ecb_stsmsewcregpc00003abs" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     27088, 29598, 23061, 32620, 31146, 30099, 30943, 23264, 19719, 23934, 25343, 22506, 19969, 23999, 12581, 67887, 36775, 34041, 38051, 27350, 22128, 35245, 31893, 32309, 32062,
                     29102, 25674, 38051, 34471, 32302, 36851, 27877, 23140, 35281, 31222, 33066, 31672, 26573, 25129, 36048, 33641, 32368, 35500, 26165, 22922, 32762, 31771, 31757, 29083, 27855,
@@ -928,14 +855,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
-                    { "Description", "Export (Goods)" },
+                    { "Description", "Balance (Goods)" },
                     { "Region", "se" },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1995, 01, 01, 0, 0, 0) },
                     { "Frequency", "quarterly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad1588" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     116, 116, 119, 105, 114, 112, 115, 102, 108, 106, 108, 97, 105, 101, 105, 96, 102, 97, 99, 93, 98, 95, 97, 91, 98, 95, 98, 94, 101, 100, 100, 98, 101, 100, 102, 89, 94, 84, 84, 76,
                     80, 79, 91, 93, 104, 101, 101, 89, 96, 95, 99, 86, 93, 93, 91, 83, 90, 82, 86, 77, 86, 80, 79, 71, 76, 74, 74, 65, 74, 71, 72, 64, 69, 71, 76, 67, 71, 67, 68, 60, 63, 60, 64, 55,
@@ -946,14 +874,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
-                    { "Description", "Hotel Nights, United States" },
+                    { "Description", "United States" },
                     { "Region", "se" },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1978, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setour0039" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     119199, 159262, 123550, 87371, 58000, 55460, 43790, 42718, 51002, 53597, 58577, 75251, 111408, 127250, 104976, 68535, 46600, 46609, 35013, 34290, 43097, 43563, 47700, 70409,
                     101419, 121713, 101422, 68253, 42424, 39371, 31770, 29747, 28193, 22457, 33038, 49698, 68151, 80778, 75839, 50382, 29826, 27733, 21733, 20479, 23959, 28876, 35348, 48670, 76962,
@@ -981,14 +910,15 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
-                    { "Description", "Youth Hotel Nights, United States" },
+                    { "Description", "United States" },
                     { "Region", "se" },
+                    { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1978, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
+                    { "EntityType", "TimeSeries" },
                     { "PrimName", "setour0141" },
-                    { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 0, 0, 0) },
                 },
-                new object[]
+                new double[]
                 {
                     3799, 4514, 6171, 4194, 2539, 2079, 1793, 2006, 1626, 1992, 2039, 3363, 5157, 5539, 5813, 4878, 2045, 2894, 2023, 3383, 2536, 2085, 2483, 3823, 4556, 6285, 5707, 4861, 2661, 2672,
                     2652, 2787, 1896, 1585, 2081, 3655, 5643, 4343, 5185, 3276, 1752, 1818, 1661, 1429, 1395, 1823, 2797, 3081, 3678, 4896, 5889, 4290, 2296, 1880, 1658, 1827, 1268, 1458, 2236, 2754,
@@ -1013,7 +943,7 @@ namespace SeriesServer.Controllers
         /// <summary>
         /// The search database, which groups SeriesRow in Groups and Aspects
         /// </summary>
-        private static readonly Dictionary<string, List<object>> BrowseDataBase = new Dictionary<string, List<object>>()
+        private static Dictionary<string, List<object>> m_browseDataBase = new Dictionary<string, List<object>>()
         {
             {
                 string.Empty,
@@ -1095,12 +1025,6 @@ namespace SeriesServer.Controllers
                         { "Description", "Other" },
                         { "SeriesReference", "Other" }
                     }
-                    ,
-                    new Dictionary<string, object>()
-                    {
-                        { "Description", "With revisions" },
-                        { "SeriesReference", "WithRevisions" }
-                    }
                 }
             },
             {
@@ -1161,7 +1085,7 @@ namespace SeriesServer.Controllers
             }
         };
 
-        private static readonly Dictionary<string, SeriesList> SeriesMetaData = new Dictionary<string, SeriesList>
+        private static Dictionary<string, SeriesList> m_seriesMetaData = new Dictionary<string, SeriesList>
         {
             {
                 "Other", new SeriesList
@@ -1172,34 +1096,7 @@ namespace SeriesServer.Controllers
                         new Group
                         (
                             string.Empty,
-                            Array.Empty<SeriesRow>()
-                        )
-                    }
-                )
-            },
-            {
-                "WithRevisions", new SeriesList
-                (
-                    null,
-                    new[]
-                    {
-                        new Group
-                        (
-                            string.Empty,
-                            new[]
-                            {
-                                new SeriesRow
-                                (
-                                    string.Empty,
-                                    0,
-                                    false,
-                                    false,
-                                    new []
-                                    {
-                                        "withrev"
-                                    }
-                                ),
-                            }
+                            new SeriesRow[0]
                         )
                     }
                 )
@@ -1571,123 +1468,6 @@ namespace SeriesServer.Controllers
                     }
                 )
             },
-        };
-
-        private static readonly Dictionary<string, object> WithRevMetaData = new()
-        {
-            { "Description", "Series with revisions" },
-            { "Region", "pl" },
-            { "StartDate", new DateTime(2017, 01, 01, 0, 0, 0) },
-            { "Frequency", "annual" },
-            { "PrimName", "withrev" },
-            { "LastModifiedTimeStamp", new DateTime(2019, 01, 01, 12, 0, 0) },
-            { "StoresRevisionHistory", "1" },
-            { "FirstRevisionTimeStamp", new DateTime(2017, 01, 01, 0, 0, 0, DateTimeKind.Utc) },
-            { "LastRevisionTimeStamp", new DateTime(2019, 01, 01, 12, 0, 0, DateTimeKind.Utc) },
-        };
-
-        private static readonly List<(DateTime Vintage, string? Label, Series Series)> WithRevSeriesVintages = new()
-        {
-            ( new DateTime(2017, 1 , 1, 0, 0, 0, DateTimeKind.Utc), "Initial", new Series
-                (
-                    new Dictionary<string, object>()
-                    {
-                    },
-                    new object[]
-                    {
-                        5726277300
-                    }
-                )
-            ),
-            ( new DateTime(2018, 1 , 1, 0, 0, 0, DateTimeKind.Utc), null, new Series
-                (
-                    new Dictionary<string, object>()
-                    {
-                    },
-                    new object[]
-                    {
-                        5726277300, 6568862600
-                    }
-                )
-            ),
-            ( new DateTime(2019, 1 , 1, 0, 0, 0, DateTimeKind.Utc), null, new Series
-                (
-                    new Dictionary<string, object>()
-                    {
-                    },
-                    new object[]
-                    {
-                        6568862600, 5374127000, 5374127000
-                    }, 
-                    new DateTime[]
-                    { 
-                        new DateTime(2017, 1, 1), new DateTime(2018, 1, 1), new DateTime(2019, 1, 1)
-                    }
-                )
-            ),
-            ( new DateTime(2019, 1 , 1, 12, 0, 0, DateTimeKind.Utc), "Update", new Series
-                (
-                    new Dictionary<string, object>()
-                    {
-                    },
-                    new object[]
-                    {
-                        5726277300, 6568862600, 5974127000
-                    },
-                    PerValueMetaData: new Dictionary<string, object>?[]
-                    {
-                        new() { { "RevisionTimeStamp", new DateTime(2017, 01, 01, 0, 0, 0, DateTimeKind.Utc) } },
-                        new() { { "RevisionTimeStamp", new DateTime(2018, 1 , 1, 0, 0, 0, DateTimeKind.Utc) } },
-                        new() { { "RevisionTimeStamp", new DateTime(2019, 1, 1, 12, 0, 0, DateTimeKind.Utc) } },
-                    }
-                )
-            ),
-        };
-
-        private static readonly List<Series> WithRevSeriesReleases = new()
-        {
-            new Series
-                (
-                    new Dictionary<string, object>()
-                    {
-                    },
-                    new object[]
-                    {
-                        5726277300, 6568862600, 5374127000
-                    },
-                    PerValueMetaData: new Dictionary<string, object>?[]
-                    {
-                        new() { { "RevisionTimeStamp", new DateTime(2017, 1, 1, 0, 0, 0, DateTimeKind.Utc) } },
-                        new() { { "RevisionTimeStamp", new DateTime(2018, 1 , 1, 0, 0, 0, DateTimeKind.Utc) } },
-                        new() { { "RevisionTimeStamp", new DateTime(2019, 1, 1, 0, 0, 0, DateTimeKind.Utc) } },
-                    }
-                ),
-            new Series
-                (
-                    new Dictionary<string, object>()
-                    {
-                    },
-                    new object[]
-                    {
-                        double.NaN, double.NaN, 5974127000
-                    },
-                    PerValueMetaData: new Dictionary<string, object>?[]
-                    {
-                        null,
-                        null,
-                        new() { { "RevisionTimeStamp", new DateTime(2019, 1, 1, 12, 0, 0, DateTimeKind.Utc) } },
-                    }
-                ),
-                new Series
-                (
-                    new Dictionary<string, object>()
-                    {
-                    },
-                    new object[]
-                    {
-                        double.NaN, double.NaN, double.NaN
-                    }
-                ),
         };
     }
 }
