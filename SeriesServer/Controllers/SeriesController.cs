@@ -10,9 +10,6 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 
-#nullable enable
-
-
 // This is a very basic sample implementation of a server that can be called from the Macrobond application
 // to retrieve series. It uses a simple in-memory list of series.
 // The sample server supports a browse tree and also support removing and editing series.
@@ -59,7 +56,7 @@ namespace SeriesServer.Controllers
         {
             var listToReturn = names.Select(LoadSeriesInternal).ToList();
 
-            if (listToReturn.Any())
+            if (listToReturn.Count != 0)
                 return listToReturn;
 
             return NotFound();
@@ -87,7 +84,7 @@ namespace SeriesServer.Controllers
         {
             // Convert the values to the expected types
 
-            Dictionary<string, object> meta = new Dictionary<string, object>();
+            Dictionary<string, object> meta = [];
             foreach (var x in series.MetaData)
             {
                 var jsonElementValue = (JsonElement)x.Value;
@@ -126,7 +123,7 @@ namespace SeriesServer.Controllers
             DateTime now = DateTime.UtcNow;
             meta["LastModifiedTimeStamp"] = now;
 
-            Series newSeries = new Series(meta, series.Values, series.Dates);
+            Series newSeries = new(meta, series.Values, series.Dates);
 
             string name = (string)newSeries.MetaData["PrimName"];
 
@@ -243,7 +240,7 @@ namespace SeriesServer.Controllers
         /// </summary>
         /// <param name="name">Name of series.</param>
         /// <returns>Requested series of null if no series with that name could be found.</returns>
-        private Series? LoadSeriesCore(string name)
+        private static Series? LoadSeriesCore(string name)
         {
             lock (m_lock)
                 return m_dataBase.FirstOrDefault(s => string.Compare((string)s.MetaData["PrimName"], name, StringComparison.OrdinalIgnoreCase) == 0);
@@ -312,7 +309,7 @@ namespace SeriesServer.Controllers
         {
             // In this sample code we just look for matching text in the description of the series. What the query means is up to the implementation, but it is typically interpreted as a set of words to search for.
 
-            List<Dictionary<string, object>> list = new List<Dictionary<string, object>>();
+            List<Dictionary<string, object>> list = [];
 
             lock (m_lock)
             {
@@ -502,12 +499,12 @@ namespace SeriesServer.Controllers
             }
         }
 
-        private static object m_lock = new object();
+        private static readonly object m_lock = new();
 
         // Sample data
 
-        private static List<Series> m_dataBase = new List<Series>
-        {
+        private static readonly List<Series> m_dataBase =
+        [
             new Series
             (
                 new Dictionary<string, object>()
@@ -521,8 +518,7 @@ namespace SeriesServer.Controllers
                     { "PrimName", "pltour0001" },
                     { "LastModifiedTimeStamp", new DateTime(2003, 01, 01, 0, 0, 0) },
                 },
-                new double[]
-                {
+                [
                     4319590.0d, 4059520.0d, 3605839.0d, 3280645.0d, 2460560.0d, 2401899.0d, 2187680.0d, 2124118.0d, 2194190.0d, 2436125.0d, 2863790.0d, 3267168.0d, 4067560.0d, 3926772.0d, 3389729.0d,
                     3012555.0d, 2467756.0d, 2205113.0d, 2045505.0d, 2019667.0d, 2116904.0d, 2273641.0d, 2671256.0d, 3123243.0d, 3803479.0d, 3755086.0d, 3250518.0d, 2847226.0d, 2285368.0d, 2107293.0d,
                     1907901.0d, 1847429.0d, 1925399.0d, 2086069.0d, 2518407.0d, 2988738.0d, 3673076.0d, 3562000.0d, 3021650.0d, 2692655.0d, 2238153.0d, 1868981.0d, 1820325.0d, 1712855.0d, 1703224.0d,
@@ -537,7 +533,7 @@ namespace SeriesServer.Controllers
                     1082660.0d, 1366319.0d, 1660568.0d, 2043446.0d, 2065591.0d, 1826157.0d, 1621937.0d, 1148687.0d, 988491.0d, 896102.0d, 920212.0d, 906420.0d, 992996.0d, 1324986.0d, 1561451.0d,
                     1998578.0d, 1953224.0d, 1735239.0d, 1552542.0d, 1048675.0d, 977898.0d, 871403.0d, 822279.0d, 810468.0d, 914851.0d, 1206840.0d, 1456858.0d, 1974578.0d, 1873718.0d, 1536640.0d,
                     1524528.0d, 929582.0d, 866119.0d, 782911.0d, 767161.0d,
-                }
+                ]
             ),
             new Series
             (
@@ -551,8 +547,7 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0021" },
                 },
-                new double[]
-                {
+                [
                     105.6, 99.8, 106.1, 93.9, 107.3, 109, 104.1, 107.2, 105.3, 99.2, 98.3, 103.9, 98.3, 103.1, 105.5, 105.6, 101, 104.8, 96.6, 101.7, 103.2, 97.5, 106, 110.3, 103.5, 103.4, 104.2,
                     100.8, 109.8, 97.8, 109.5, 99.5, 113.1, 105.5, 108.5, 102.6, 104.8, 114.4, 103, 115.6, 109.1, 106.8, 102.6, 104.4, 95.2, 100.1, 101.7, 93.9, 98, 93.6, 94.8, 93.4, 86, 100.4, 106.7,
                     106.1, 102.1, 107.8, 105, 108.5, 110.3, 108.1, 109.5, 110, 119.2, 111.1, 111.1, 109.4, 109.7, 107.7, 96.4, 101.6, 104.9, 96.1, 101.9, 100.5, 92.9, 101.7, 92.9, 97.6, 97.2, 95.3,
@@ -560,7 +555,7 @@ namespace SeriesServer.Controllers
                     113.2, 110.4, 109.1, 103, 102.8, 102, 105.5, 97.2, 97, 90.5, 94.1, 94.7, 92.1, 91.1, 87.9, 89.8, 101.1, 88.8, 86.5, 103.7, 93.7, 105, 106.8, 92.4, 106.4, 105.9, 105.1, 113.8,
                     101.8, 120.8, 108.1, 96.8, 105.8, 110.9, 103.1, 107, 109.9, 104.8, 103.5, 107.5, 111.9, 111.7, 118.5, 101.4, 109.1, 114.6, 107.2, 106.7, 105.9, 110, 114.3, 101.6, 109.1, 101.8,
                     99.8, 103.3, 101.8, 94.8, 95.5, 98.4, 93, 97.3, 95.4, 86.8, 88.4, 96.3, 99.9, 98.6, 100.8,
-                }
+                ]
             ),
             new Series
             (
@@ -574,8 +569,7 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0014" },
                 },
-                new double[]
-                {
+                [
                     117.1, 112.3, 116.3, 104.2, 110.9, 121.6, 99.8, 109.4, 108.7, 105.5, 108.8, 114.2, 104.6, 109.5, 107.7, 105.4, 108.8, 107.9, 108.6, 111, 112.2, 110.9, 120, 121, 117.8, 124.2, 124,
                     128.5, 127.2, 124.2, 126.9, 116.6, 129, 107.9, 112.6, 106.2, 106.7, 108.3, 101, 103.6, 104.1, 103.7, 101.7, 107.6, 99.2, 108.1, 108.4, 103.8, 110.9, 98.3, 94.4, 97.5, 95.3, 89.6,
                     101.6, 94.3, 95.5, 97.6, 90.4, 92.9, 96.7, 103.8, 102.8, 103.8, 102, 107.9, 102.8, 105.6, 100.3, 106.9, 99.2, 101.7, 106.1, 99.3, 109, 108.5, 104, 106.5, 102.5, 104.6, 108.4, 94.5,
@@ -584,7 +578,7 @@ namespace SeriesServer.Controllers
                     121.5, 114.7, 129.4, 117.2, 131.9, 127.8, 112.3, 116.3, 118.9, 113.1, 114.2, 98.9, 111.7, 118.8, 117.3, 114.1, 112, 117, 110.6, 112.2, 116.6, 109.5, 110.4, 132.8, 107.1, 111.9,
                     112.8, 111.8, 111.9, 109, 107.5, 107, 105.7, 107.7, 111.2, 102.7, 106, 108.7, 101.8, 102.8, 107.4, 102.2, 103.2, 114.7, 104.4, 110.4, 114.1, 110.1, 117.8, 106.8, 100.8, 117.1,
                     104.3, 104.3, 103, 93.9, 97.6, 99.1, 88.3, 91.6, 92.2, 90.3, 98.1, 84.3, 89.2, 85.5, 93.5, 92.9, 90.4, 95.2, 93.7, 96.4, 97.3, 96.4, 95.4, 103.7, 109.2, 107.9,
-                }
+                ]
             ),
             new Series
             (
@@ -598,8 +592,7 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "ecb_stsmplwcregpc00003abs" },
                 },
-                new double[]
-                {
+                [
                     36179, 48945, 48034, 48014, 46473, 46133, 52224, 44408, 45141, 48248, 41836, 39173, 28955, 55731, 46904, 45846, 43263, 46041, 52013, 42755, 45292, 51034, 40990, 41158, 38009,
                     33915, 38634, 41668, 39192, 42074, 48070, 38992, 38739, 43374, 37240, 33914, 32308, 27838, 32792, 37050, 33676, 34334, 39490, 32999, 34662, 35804, 30355, 29529, 26967, 23969,
                     29031, 30229, 27770, 28375, 33825, 28814, 31250, 29420, 25210, 28162, 23316, 21066, 25029, 26511, 24171, 27896, 37353, 33072, 29689, 27146, 24971, 25883, 22151, 19399, 24313,
@@ -609,7 +602,7 @@ namespace SeriesServer.Controllers
                     28134, 22342, 22380, 22940, 21300, 21210, 19559, 17146, 19910, 20867, 19490, 21168, 21031, 18421, 18360, 18532, 17144, 16565, 16999, 17462, 20570, 22290, 21351, 19913, 24081,
                     20118, 23409, 21827, 19919, 20693, 20343, 19908, 22394, 23851, 26596, 44830, 38025, 30656, 29655, 37373, 32905, 31493, 30380, 25319, 28841, 30790, 31650, 31162, 29119, 25817,
                     27715,
-                }
+                ]
             ),
             new Series
             (
@@ -623,10 +616,9 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0135" },
                 },
-                new double[]
-                {
+                [
                     26200000000, 23367941400, 18859110800, 16841434600, 15174652800, 15239242500, 11754934900, 10879093500, 8761157500, 7639377800, 5907934000, 5726277300, 6568862600, 5974127000,
-                }
+                ]
             ),
             new Series
             (
@@ -640,10 +632,9 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0131" },
                 },
-                new double[]
-                {
+                [
                     27600000000, 25027500000, 22135300000, 19773500000, 17168200000, 17430700000, 16579900000, 14139100000, 13560300000, 10722000000, 10975000000, 9621600000, 8688200000, 7819500000,
-                }
+                ]
             ),
             new Series
             (
@@ -657,8 +648,7 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "pltrad0051" },
                 },
-                new double[]
-                {
+                [
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
                     103487700000, 88747800000, 74297800000, 58215300000, 42986600000, 29336400000, 15848200000, 168644000000, 160453000000, 144431700000, 128103300000, 111922200000, 97781700000,
                     86655400000, 74164000000, 60492000000, 45577500000, 29767200000, 16367800000, 156939600000, 144658900000, 129372100000, 115541200000, 102080400000, 90591700000, 80197800000,
@@ -681,7 +671,7 @@ namespace SeriesServer.Controllers
                     -19165200000, -15071000000, -10892700000, -6093100000, -2529300000, -43819200000, -38618700000, -34286100000, -30360100000, -26635100000, -23304600000, -19465700000, -15793100000,
                     -12199100000, -8465900000, -5424100000, -2981900000, -26281300000, -22710800000, -19835500000, -16996000000, -14721300000, -12976600000, -10876900000, -8597600000, -6424800000,
                     -4377500000, -2872600000, -1360200000,
-                }
+                ]
             ),
             new Series
             (
@@ -695,8 +685,7 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad2195" },
                 },
-                new double[]
-                {
+                [
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
                     103487700000, 88747800000, 74297800000, 58215300000, 42986600000, 29336400000, 15848200000, 168644000000, 160453000000, 144431700000, 128103300000, 111922200000, 97781700000,
                     86655400000, 74164000000, 60492000000, 45577500000, 29767200000, 16367800000, 156939600000, 144658900000, 129372100000, 115541200000, 102080400000, 90591700000, 80197800000,
@@ -719,7 +708,7 @@ namespace SeriesServer.Controllers
                     -19165200000, -15071000000, -10892700000, -6093100000, -2529300000, -43819200000, -38618700000, -34286100000, -30360100000, -26635100000, -23304600000, -19465700000, -15793100000,
                     -12199100000, -8465900000, -5424100000, -2981900000, -26281300000, -22710800000, -19835500000, -16996000000, -14721300000, -12976600000, -10876900000, -8597600000, -6424800000,
                     -4377500000, -2872600000, -1360200000,
-                }
+                ]
             ),
             new Series(
                 new Dictionary<string, object>
@@ -731,18 +720,16 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "dt" },
                 },
-                new double[]
-                {
+                [
                     5, 4, 3, 4,
                     5, 4, 3, 4,
                     5, 4, 3, 4,
-                },
-                new[]
-                {
+                ],
+                [
                     new DateTime(2017, 01, 01), new DateTime(2017, 01, 02), new DateTime(2017, 01, 03),new DateTime(2017, 01, 04),
                     new DateTime(2017, 01, 06), new DateTime(2017, 01, 07), new DateTime(2017, 01, 08), new DateTime(2017, 01, 09),
                     new DateTime(2017, 01, 11), new DateTime(2017, 01, 12), new DateTime(2017, 01, 13), new DateTime(2017, 01, 14),
-                }
+                ]
             ),
             new Series
             (
@@ -756,8 +743,7 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad2136" },
                 },
-                new double[]
-                {
+                [
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
                     103487700000, 88747800000, 74297800000, 58215300000, 42986600000, 29336400000, 15848200000, 168644000000, 160453000000, 144431700000, 128103300000, 111922200000, 97781700000,
                     86655400000, 74164000000, 60492000000, 45577500000, 29767200000, 16367800000, 156939600000, 144658900000, 129372100000, 115541200000, 102080400000, 90591700000, 80197800000,
@@ -780,7 +766,7 @@ namespace SeriesServer.Controllers
                     -19165200000, -15071000000, -10892700000, -6093100000, -2529300000, -43819200000, -38618700000, -34286100000, -30360100000, -26635100000, -23304600000, -19465700000, -15793100000,
                     -12199100000, -8465900000, -5424100000, -2981900000, -26281300000, -22710800000, -19835500000, -16996000000, -14721300000, -12976600000, -10876900000, -8597600000, -6424800000,
                     -4377500000, -2872600000, -1360200000,
-                }
+                ]
             ),
             new Series
             (
@@ -794,8 +780,7 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad2128" },
                 },
-                new double[]
-                {
+                [
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
                     103487700000, 88747800000, 74297800000, 58215300000, 42986600000, 29336400000, 15848200000, 168644000000, 160453000000, 144431700000, 128103300000, 111922200000, 97781700000,
                     86655400000, 74164000000, 60492000000, 45577500000, 29767200000, 16367800000, 156939600000, 144658900000, 129372100000, 115541200000, 102080400000, 90591700000, 80197800000,
@@ -818,7 +803,7 @@ namespace SeriesServer.Controllers
                     -19165200000, -15071000000, -10892700000, -6093100000, -2529300000, -43819200000, -38618700000, -34286100000, -30360100000, -26635100000, -23304600000, -19465700000, -15793100000,
                     -12199100000, -8465900000, -5424100000, -2981900000, -26281300000, -22710800000, -19835500000, -16996000000, -14721300000, -12976600000, -10876900000, -8597600000, -6424800000,
                     -4377500000, -2872600000, -1360200000,
-                }
+                ]
             ),
             new Series
             (
@@ -832,8 +817,7 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "ecb_stsmsewcregpc00003abs" },
                 },
-                new double[]
-                {
+                [
                     27088, 29598, 23061, 32620, 31146, 30099, 30943, 23264, 19719, 23934, 25343, 22506, 19969, 23999, 12581, 67887, 36775, 34041, 38051, 27350, 22128, 35245, 31893, 32309, 32062,
                     29102, 25674, 38051, 34471, 32302, 36851, 27877, 23140, 35281, 31222, 33066, 31672, 26573, 25129, 36048, 33641, 32368, 35500, 26165, 22922, 32762, 31771, 31757, 29083, 27855,
                     23531, 31030, 30623, 30381, 31301, 23856, 20936, 27367, 27107, 27540, 25640, 25157, 19957, 29462, 27850, 27403, 28232, 21635, 18559, 27496, 25110, 24694, 24689, 21704, 17703,
@@ -849,7 +833,7 @@ namespace SeriesServer.Controllers
                     8597, 8199, 15051, 15564, 16174, 15435, 10769, 10666, 11790, 12178, 12664, 10314, 7819, 6488, 9730, 11330, 10863, 12600, 9598, 8491, 11514, 10069, 11438, 10580, 8688, 10111, 14749,
                     16395, 17028, 16715, 13704, 13214, 16394, 17448, 17939, 15014, 10713, 11057, 17822, 19223, 19859, 18386, 13468, 11742, 15236, 16191, 19397, 16928, 13461, 12858, 23899, 22922,
                     22621, 25219, 20986, 20586,
-                }
+                ]
             ),
             new Series
             (
@@ -863,12 +847,11 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "setrad1588" },
                 },
-                new double[]
-                {
+                [
                     116, 116, 119, 105, 114, 112, 115, 102, 108, 106, 108, 97, 105, 101, 105, 96, 102, 97, 99, 93, 98, 95, 97, 91, 98, 95, 98, 94, 101, 100, 100, 98, 101, 100, 102, 89, 94, 84, 84, 76,
                     80, 79, 91, 93, 104, 101, 101, 89, 96, 95, 99, 86, 93, 93, 91, 83, 90, 82, 86, 77, 86, 80, 79, 71, 76, 74, 74, 65, 74, 71, 72, 64, 69, 71, 76, 67, 71, 67, 68, 60, 63, 60, 64, 55,
                     58, 58, 58, 51, 56, 51, 53, 45, 50, 48, 49, 42, 46, 47,
-                }
+                ]
             ),
             new Series
             (
@@ -882,8 +865,7 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "setour0039" },
                 },
-                new double[]
-                {
+                [
                     119199, 159262, 123550, 87371, 58000, 55460, 43790, 42718, 51002, 53597, 58577, 75251, 111408, 127250, 104976, 68535, 46600, 46609, 35013, 34290, 43097, 43563, 47700, 70409,
                     101419, 121713, 101422, 68253, 42424, 39371, 31770, 29747, 28193, 22457, 33038, 49698, 68151, 80778, 75839, 50382, 29826, 27733, 21733, 20479, 23959, 28876, 35348, 48670, 76962,
                     71707, 71983, 42687, 25958, 26064, 20415, 19487, 19533, 22301, 29164, 45614, 62966, 70563, 67720, 47052, 26881, 28933, 21562, 19928, 22266, 20987, 26639, 41325, 62166, 62837,
@@ -904,7 +886,7 @@ namespace SeriesServer.Controllers
                     12448, 19089, 44843, 87106, 86282, 62752, 31624, 14624, 11554, 7756, 7632, 7542, 9038, 14525, 29274, 59919, 62863, 49547, 24634, 12508, 10322, 7657, 6356, 6870, 9259, 14622, 27547,
                     52750, 54295, 46492, 27691, 10806, 9337, 6676, 6580, 5536, 8691, 15053, 26833, 48905, 50987, 43949, 15246, 9511, 8758, 7983, 7880, 6663, 10117, 15739, 30687, 52933, 66973, 49536,
                     24886, 10089, 9026, 5710, 7420, 6228, 9199, 13843, 33920, 54512, 61494, 51200, 25524, 11072, 7867, 6706, 7160,
-                }
+                ]
             ),
             new Series
             (
@@ -918,8 +900,7 @@ namespace SeriesServer.Controllers
                     { "EntityType", "TimeSeries" },
                     { "PrimName", "setour0141" },
                 },
-                new double[]
-                {
+                [
                     3799, 4514, 6171, 4194, 2539, 2079, 1793, 2006, 1626, 1992, 2039, 3363, 5157, 5539, 5813, 4878, 2045, 2894, 2023, 3383, 2536, 2085, 2483, 3823, 4556, 6285, 5707, 4861, 2661, 2672,
                     2652, 2787, 1896, 1585, 2081, 3655, 5643, 4343, 5185, 3276, 1752, 1818, 1661, 1429, 1395, 1823, 2797, 3081, 3678, 4896, 5889, 4290, 2296, 1880, 1658, 1827, 1268, 1458, 2236, 2754,
                     4113, 4741, 4687, 3144, 1896, 1421, 1157, 1154, 1091, 1495, 1421, 2497, 3538, 3986, 4293, 2673, 1353, 1847, 903, 1185, 1082, 1127, 1459, 2584, 3741, 3725, 3451, 2290, 1056, 1176,
@@ -936,14 +917,14 @@ namespace SeriesServer.Controllers
                     2552, 2911, 2737, 763, 402, 214, 206, 141, 213, 443, 899, 1069, 2598, 2731, 2237, 502, 457, 214, 405, 140, 124, 305, 681, 1019, 3300, 3044, 2607, 645, 400, 304, 96, 93, 150, 323,
                     821, 1003, 2499, 2621, 3128, 471, 421, 185, 147, 122, 164, 368, 906, 950, 2013, 3552, 2496, 392, 252, 142, 24, 18, 24, 85, 990, 819, 3147, 3945, 3100, 219, 360, 69, 15, 4, 19, 45,
                     665, 777, 1106, 1637, 786, 386, 289, 144, 17, 9,
-                }
+                ]
             ),
-        };
+        ];
 
         /// <summary>
         /// The search database, which groups SeriesRow in Groups and Aspects
         /// </summary>
-        private static Dictionary<string, List<object>> m_browseDataBase = new Dictionary<string, List<object>>()
+        private static readonly Dictionary<string, List<object>> m_browseDataBase = new()
         {
             {
                 string.Empty,
@@ -956,8 +937,8 @@ namespace SeriesServer.Controllers
                             "Children",
                             new List<Dictionary<string, object>>()
                             {
-                                new Dictionary<string, object> { { "Description", "Trade" }, { "ChildrenReference", "SwedenTrade" } },
-                                new Dictionary<string, object> { { "Description", "Tourism" }, { "ChildrenReference", "SwedenTourism" } }
+                                new() { { "Description", "Trade" }, { "ChildrenReference", "SwedenTrade" } },
+                                new() { { "Description", "Tourism" }, { "ChildrenReference", "SwedenTourism" } }
                             }
                         }
                     },
@@ -967,47 +948,44 @@ namespace SeriesServer.Controllers
                             "Children",
                             new List<Dictionary<string, object>>
                             {
-                                new Dictionary<string, object> {
+                                new() {
                                     { "Description", "Tourism" },
                                     {
                                         "Children",
-                                        new List<Dictionary<string, object>> { new Dictionary<string, object> {{ "Description", "Arrivals" }, { "SeriesReference", "PolandTourismArrivals" }} }
+                                        new List<Dictionary<string, object>> { new() { { "Description", "Arrivals" }, { "SeriesReference", "PolandTourismArrivals" }} }
                                     }
                                 },
-                                new Dictionary<string, object>
-                                {
+                                new() {
                                     { "Description", "Trade" },
                                     { "Children",
                                         new List<Dictionary<string, object>>
                                         {
-                                            new Dictionary<string, object> {
+                                            new() {
                                                 {"Description", "Domestic Trade"},
                                                 {
                                                     "Children",
                                                     new List<Dictionary<string, object>>
                                                     {
-                                                        new Dictionary<string, object> {{"Description", "Wholesale Trade"}, {"SeriesReference", "PolandTradeDomesticTradeWholesaleTrade"}},
-                                                        new Dictionary<string, object> {{"Description", "ECB Passenger Car Registration"}, {"SeriesReference", "PolandTradeDomesticEBCCarRegistration"}}
+                                                        new() {{"Description", "Wholesale Trade"}, {"SeriesReference", "PolandTradeDomesticTradeWholesaleTrade"}},
+                                                        new() {{"Description", "ECB Passenger Car Registration"}, {"SeriesReference", "PolandTradeDomesticEBCCarRegistration"}}
                                                     }
                                                 }
                                             },
-                                            new Dictionary<string, object>
-                                            {
+                                            new() {
                                                 { "Description", "Foreign Trade" },
                                                 {
                                                     "Children",
                                                     new List<Dictionary<string, object>>
                                                     {
-                                                        new Dictionary<string, object>
-                                                        {
+                                                        new() {
                                                             {"Description", "Countries"},
                                                             {
                                                                 "Children",
                                                                 new List<Dictionary<string, object>>
                                                                 {
-                                                                    new Dictionary<string, object> {{"Description", "Export"}, {"SeriesReference", "PolandTradeForeignCountriesExport"}},
-                                                                    new Dictionary<string, object> {{"Description", "Import"}, {"SeriesReference", "PolandTradeForeignCountriesImport" } },
-                                                                    new Dictionary<string, object> {{"Description", "Trade Balance"}, {"SeriesReference", "PolandTradeForeignCountriesBalance" } },
+                                                                    new() {{"Description", "Export"}, {"SeriesReference", "PolandTradeForeignCountriesExport"}},
+                                                                    new() {{"Description", "Import"}, {"SeriesReference", "PolandTradeForeignCountriesImport" } },
+                                                                    new() {{"Description", "Trade Balance"}, {"SeriesReference", "PolandTradeForeignCountriesBalance" } },
                                                                 }
                                                             }
                                                         },
@@ -1046,8 +1024,8 @@ namespace SeriesServer.Controllers
                             "Children",
                             new List<Dictionary<string, object>>
                             {
-                                new Dictionary<string, object> {{ "Description", "Hotels" }, { "SeriesReference", "SwedenTourismHotels" } },
-                                new Dictionary<string, object> {{ "Description", "Youth Hostels" }, { "SeriesReference", "SwedenTourismYouthHostels" } },
+                                new() {{ "Description", "Hotels" }, { "SeriesReference", "SwedenTourismHotels" } },
+                                new() {{ "Description", "Youth Hostels" }, { "SeriesReference", "SwedenTourismYouthHostels" } },
                             }
                         }
                     }
@@ -1064,8 +1042,8 @@ namespace SeriesServer.Controllers
                             "Children",
                             new List<Dictionary<string, object>>
                             {
-                                new Dictionary<string, object> { { "Description", "Sector Totals" }, { "SeriesReference", "SwedenWholesaleTradeSectorTotals" } },
-                                new Dictionary<string, object> { { "Description", "Totals" }, { "SeriesReference", "SwedenWholesaleTradeTotals" } },
+                                new() { { "Description", "Sector Totals" }, { "SeriesReference", "SwedenWholesaleTradeSectorTotals" } },
+                                new() { { "Description", "Totals" }, { "SeriesReference", "SwedenWholesaleTradeTotals" } },
                             }
                         }
                     },
@@ -1085,196 +1063,175 @@ namespace SeriesServer.Controllers
             }
         };
 
-        private static Dictionary<string, SeriesList> m_seriesMetaData = new Dictionary<string, SeriesList>
+        private static readonly Dictionary<string, SeriesList> m_seriesMetaData = new()
         {
             {
                 "Other", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             string.Empty,
-                            new SeriesRow[0]
+                            []
                         )
-                    }
+                    ]
                 )
             },
             {
                 "PolandTourismArrivals", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "pltour0001"
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
             {
                 "PolandTradeDomesticTradeWholesaleTrade", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             "Food",
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "pltrad0014",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         ),
                         new Group
                         (
                             "Other",
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "pltrad0021",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         ),
-                    }
+                    ]
                 )
             },
             {
                 "PolandTradeDomesticEBCCarRegistration", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "ecb_stsmplwcregpc00003abs",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
             {
                 "PolandTradeForeignCountriesExport", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "pltrad0135",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
             {
                 "PolandTradeForeignCountriesImport", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "pltrad0131",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
             {
                 "PolandTradeForeignCountriesBalance", new SeriesList
                 (
-                    new[] { new Aspect("Aspect 1", "The first aspect"), new Aspect("Aspect 2", "The second aspect") },
-                    new[]
-                    {
+                    [new Aspect("Aspect 1", "The first aspect"), new Aspect("Aspect 2", "The second aspect")],
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "pltrad0051",
-                                    }
+                                    ]
                                 ),
                                 new SeriesRow
                                 (
@@ -1282,38 +1239,34 @@ namespace SeriesServer.Controllers
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "pltrad0131",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
             {
                 "SwedenWholesaleTradeSectorTotals", new SeriesList
                 (
-                    new [] { new Aspect("Calendar Adjusted, Current Prices", "Calendar Adjusted, Current Prices"), new Aspect("Constant Prices", "Constant Prices"), },
-                    new[]
-                    {
+                    [new Aspect("Calendar Adjusted, Current Prices", "Calendar Adjusted, Current Prices"), new Aspect("Constant Prices", "Constant Prices"),],
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "setrad2195",
                                         "setrad2136",
-                                    }
+                                    ]
                                 ),
                                 new SeriesRow
                                 (
@@ -1321,151 +1274,135 @@ namespace SeriesServer.Controllers
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "setrad2136",
                                         "setrad2195",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
             {
                 "SwedenWholesaleTradeTotals", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "setrad2128",
                                         "setrad2136",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
             {
                 "SwedenTradeECBCarRegistration", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "ecb_stsmsewcregpc00003abs",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
             {
                 "SwedenForeignTradeTotals", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     true,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "setrad1588",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
             {
                 "SwedenTourismHotels", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "setour0039",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
             {
                 "SwedenTourismYouthHostels", new SeriesList
                 (
                     null,
-                    new[]
-                    {
+                    [
                         new Group
                         (
                             string.Empty,
-                            new[]
-                            {
+                            [
                                 new SeriesRow
                                 (
                                     string.Empty,
                                     0,
                                     false,
                                     false,
-                                    new []
-                                    {
+                                    [
                                         "setour0141",
-                                    }
+                                    ]
                                 ),
-                            }
+                            ]
                         )
-                    }
+                    ]
                 )
             },
         };

@@ -1,8 +1,5 @@
-﻿// Macrobond Financial AB 2020-2023
+﻿// Macrobond Financial AB 2020-2024
 
-using System;
-using System.IO;
-using System.Reflection;
 using System.Text.Json.Serialization;
 #if USEAUTHENTICATION
 using Microsoft.AspNetCore.Authentication;

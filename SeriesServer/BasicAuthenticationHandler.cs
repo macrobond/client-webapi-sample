@@ -28,22 +28,27 @@ namespace SeriesServer
         /// <inheritdoc />
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            if(!Request.Headers.ContainsKey("Authorization"))
-                return Task.FromResult(AuthenticateResult.Fail("Missing authorization header!"));
-
             try
             {
-                AuthenticationHeaderValue header = AuthenticationHeaderValue.Parse(Request.Headers["Authorization"]);
-                if (header.Scheme != "Basic")
+                if (!Request.Headers.TryGetValue("Authorization", out Microsoft.Extensions.Primitives.StringValues authHeader))
+                    return Task.FromResult(AuthenticateResult.Fail("Missing authorization header!"));
+
+                string? authHeaderString = authHeader;
+
+                if (authHeaderString is null)
+                    return Task.FromResult(AuthenticateResult.Fail("Empty authorization header!"));
+
+                AuthenticationHeaderValue headerValue = AuthenticationHeaderValue.Parse(authHeaderString);
+                if (headerValue.Scheme != "Basic" || headerValue.Parameter is null)
                     return Task.FromResult(AuthenticateResult.Fail("Invalid authorization header!"));
 
-                byte[] loginString = Convert.FromBase64String(header.Parameter);
+                byte[] loginString = Convert.FromBase64String(headerValue.Parameter);
                 string[] credentials = Encoding.ASCII.GetString(loginString).Split(':');
                 string userName = credentials[0];
                 string password = credentials[1];
 
                 if (userName == m_userName && password == m_password)
-                    return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity(new Claim[] {new Claim(ClaimTypes.NameIdentifier, "545"), new Claim(ClaimTypes.Name, m_userName), }, Scheme.Name)), Scheme.Name)));
+                    return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "545"), new Claim(ClaimTypes.Name, m_userName),], Scheme.Name)), Scheme.Name)));
 
                 return Task.FromResult(AuthenticateResult.Fail("Authorization failed! Wrong username or password!"));
             }

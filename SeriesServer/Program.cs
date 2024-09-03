@@ -1,7 +1,5 @@
-﻿// Macrobond Financial AB 2020-2023
+﻿// Macrobond Financial AB 2020-2024
 
-using System;
-using System.Collections.Generic;
 using System.IO;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
