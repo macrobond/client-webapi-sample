@@ -66,7 +66,7 @@ namespace SeriesServer.Controllers
                 Series? series = LoadSeriesCore(name);
                 if (series == null)
                     return new DownloadResult("Series could not be found!");
-                series.Values = series.Values.Reverse().ToArray();
+                series.Values = series.Values.ToArray();
                 series.MetaData[LastModifiedTimeStamp] = DateTime.Now;
                 return new DownloadResult(series);
             }
