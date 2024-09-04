@@ -174,16 +174,16 @@ namespace SeriesServer.Controllers
         /// <summary>
         /// Removes a series from the database.
         /// </summary>
-        /// <param name="name">Name of ther series to be removed.</param>
+        /// <param name="n">Name of ther series to be removed.</param>
         /// <returns>Returns 404 if series could not be found.</returns>
         /// <remarks>This method will only ever be called if the server has returned EditSeries capability in GetCapabalities</remarks>
-        [HttpPost("removeseries")]
-        public ActionResult RemoveSeries([FromBody] string name)
+        [HttpGet("removeseries")]
+        public ActionResult RemoveSeries([FromQuery] string n)
         {
             bool found;
             lock (m_lock)
             {
-                int index = m_dataBase.FindIndex(s => name == (string)s.MetaData["PrimName"]);
+                int index = m_dataBase.FindIndex(s => n == (string)s.MetaData["PrimName"]);
 
                 if (index >= 0)
                 {
@@ -204,7 +204,7 @@ namespace SeriesServer.Controllers
                         {
                             for (int y = 0; y < g.Series[x].Names.Length; y++)
                             {
-                                if (g.Series[x].Names[y] == name)
+                                if (g.Series[x].Names[y] == n)
                                     removeAt = (x, y);
                             }
                         }
