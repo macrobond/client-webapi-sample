@@ -66,7 +66,7 @@ namespace SeriesServer.Controllers
                 Series? series = LoadSeriesCore(name);
                 if (series == null)
                     return new DownloadResult("Series could not be found!");
-                series.Values = series.Values.ToArray();
+                series.Values = series.Values.Reverse().ToArray();
                 series.MetaData[LastModifiedTimeStamp] = DateTime.Now;
                 return new DownloadResult(series);
             }
@@ -174,16 +174,16 @@ namespace SeriesServer.Controllers
         /// <summary>
         /// Removes a series from the database.
         /// </summary>
-        /// <param name="n">Name of ther series to be removed.</param>
+        /// <param name="name">Name of ther series to be removed.</param>
         /// <returns>Returns 404 if series could not be found.</returns>
         /// <remarks>This method will only ever be called if the server has returned EditSeries capability in GetCapabalities</remarks>
-        [HttpGet("removeseries")]
-        public ActionResult RemoveSeries([FromQuery] string n)
+        [HttpPost("removeseries")]
+        public ActionResult RemoveSeries([FromBody] string name)
         {
             bool found;
             lock (m_lock)
             {
-                int index = m_dataBase.FindIndex(s => n == (string)s.MetaData["PrimName"]);
+                int index = m_dataBase.FindIndex(s => name == (string)s.MetaData["PrimName"]);
 
                 if (index >= 0)
                 {
@@ -204,7 +204,7 @@ namespace SeriesServer.Controllers
                         {
                             for (int y = 0; y < g.Series[x].Names.Length; y++)
                             {
-                                if (g.Series[x].Names[y] == n)
+                                if (g.Series[x].Names[y] == name)
                                     removeAt = (x, y);
                             }
                         }
@@ -226,8 +226,8 @@ namespace SeriesServer.Controllers
             }
 
             if (found)
-                return Ok();
-            return NotFound();
+                    return Ok();
+                return NotFound();
         }
 
         /// <summary>
