@@ -77,10 +77,11 @@ namespace SeriesServer.Controllers
         /// </summary>
         /// <param name="series">The series data including values, dates and metadata.</param>
         /// <param name="lastModified">Included when a series is replaced. This is the timestamp returned from the previous call to this method or LoadSeries. Typically the save operation fails if this does not match the strored series.</param>
+        /// <param name="forceReplace">To force an update even though the series was not loaded with the last data from the database.</param>
         /// <returns>The timestamp when the series was stored.</returns>
         /// <remarks>This method will only ever be called if the server has returned EditSeries capability in GetCapabalities</remarks>
         [HttpPost("createseries")]
-        public ActionResult<DateTime> CreateSeries([FromBody] Series series, [FromQuery] DateTime? lastModified)
+        public ActionResult<DateTime> CreateSeries([FromBody] Series series, [FromQuery] DateTime? lastModified, [FromQuery] bool forceReplace)
         {
             // Convert the values to the expected types
 
@@ -137,11 +138,11 @@ namespace SeriesServer.Controllers
                     var item = m_dataBase[index];
                     if ((string)item.MetaData["PrimName"] == name)
                     {
-                        if (lastModified is null)
+                        if (!forceReplace && lastModified is null)
                             return Conflict("Series with that name already exists");
 
                         var oldDt = (DateTime)item.MetaData[LastModifiedTimeStamp];
-                        if (lastModified == oldDt)
+                        if (forceReplace || lastModified == oldDt)
                         {
                             m_dataBase[index] = newSeries;
                             return (DateTime)item.MetaData[LastModifiedTimeStamp];
