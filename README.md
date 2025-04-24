@@ -32,11 +32,11 @@ For more details about the Kestrel server see the [Microsoft documentation](http
 
 ## Testing the server
 When the server is up an running, you can configure the Macrobond Application to be aware of this database.
-1. In the repository there is a sample configuration file called configWebApi.xml. Make sure that it points to the server URL.
-2. In the Macrobond application, select Edit|Settings then go to the "My series" tab.
+1. In this repository there is a sample configuration file called configWebApi.xml. Make sure that it points to the server URL.
+2. In the Macrobond application, select Configure|Settings then go to the "My series" tab.
 3. Select to add a new database of type "Web API"
 4. Call it `Test`, set the prefix to `test` and specify the path of the config file.
 5. Select OK. The application will then reload all settings which takes a few seconds.
 
-In the list of databases at the top of the data trees in the application, you should now find a database called "Test". You should be able to see the data tree that is provided by the sample server.
+In the list of databases at the top of the data trees in the application (Vertical tabs|Analytics|Browse|Top field|Bottom of list), you should now find a database called "Test". You should be able to see the data tree that is provided by the sample server.
 If you make changes to the config file, you need to restart the application for changes to take effect.
