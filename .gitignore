@@ -2,8 +2,8 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/SeriesServer/bin
-/SeriesServer/obj
-/.vs
-/SeriesServer/.config/dotnet-tools.json
-/SeriesServer/SeriesServer.csproj.user
+**/SeriesServer/bin/
+**/SeriesServer/obj/
+**/.vs/
+**/SeriesServer/.config/dotnet-tools.json
+**/SeriesServer/SeriesServer.csproj.user

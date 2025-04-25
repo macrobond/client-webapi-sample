@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<web:WebApiSeriesProvider xmlns:web="http://schemas.mbnd.eu/2019/webapiseriesprovider">
+  <web:Host>http://localhost:50000</web:Host>
+	<web:UseOAuth>true</web:UseOAuth>
+</web:WebApiSeriesProvider>

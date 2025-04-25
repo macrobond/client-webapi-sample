@@ -1,0 +1,27 @@
+﻿// Macrobond Financial AB 2020-2025
+
+using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using System.IO;
+
+namespace SeriesServer
+{
+    public class Program
+    {
+        public static void Main(string[] args)
+        {
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("hosting.json", optional: true)
+                .AddCommandLine(args) // Use command line args here so that they override hosting.json.
+                .Build();
+
+            CreateWebHostBuilder(args).UseConfiguration(configuration).Build().Run();
+        }
+
+        public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
+            WebHost.CreateDefaultBuilder(args)
+                .UseStartup<Startup>();
+    }
+}
