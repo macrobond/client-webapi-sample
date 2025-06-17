@@ -6,13 +6,13 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Net;
 using System.Text.Json;
-
+using System.Threading;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 
 // This is a very basic sample implementation of a server that can be called from the Macrobond application
 // to retrieve series. It uses a simple in-memory list of series.
-// The sample server supports a browse tree and also support removing and editing series.
+// The sample server supports a browse tree and also supports removing and editing series.
 
 namespace SeriesServer.Controllers
 {
@@ -35,6 +35,8 @@ namespace SeriesServer.Controllers
 
         private static bool ImplementsSearch => true;
 
+        private static bool ImplementsMeta => true;
+
         /// <summary>
         /// Declare if this server support Browse, Search and Edit. This will enable features in the client application.
         /// </summary>
@@ -42,7 +44,7 @@ namespace SeriesServer.Controllers
         [HttpGet("getcapabilities")]
         public ActionResult<Implements> GetCapabilities()
         {
-            return new Implements(ImplementsBrowse, ImplementsSearch, ImplementsEditSeries);
+            return new Implements { Browse = ImplementsBrowse, Search = ImplementsSearch, EditSeries = ImplementsEditSeries, Meta = ImplementsMeta };
         }
 
         /// <summary>
@@ -61,14 +63,38 @@ namespace SeriesServer.Controllers
 
             return NotFound();
 
-            DownloadResult LoadSeriesInternal(string name)
+            static DownloadResult LoadSeriesInternal(string name)
             {
                 Series? series = LoadSeriesCore(name);
                 if (series == null)
                     return new DownloadResult("Series could not be found!");
-                series.Values = series.Values.ToArray();
-                series.MetaData[LastModifiedTimeStamp] = DateTime.Now;
                 return new DownloadResult(series);
+            }
+        }
+
+        /// <summary>
+        /// Returns one or more sets of metadata identified by a list of names.
+        /// </summary>
+        /// <param name="names">Names of series to find.</param>
+        /// <returns>List of series.</returns>
+        /// <remarks>This method is optional and may be called if <see cref="Implements.Meta"/> is <see langword="true"/>.</remarks>
+        [HttpGet("loadmeta")]
+        public ActionResult<List<DownloadResult>> LoadMeta([Required][FromQuery(Name = "n")] string[] names)
+        {
+            var listToReturn = names.Select(LoadSeriesInternal).ToList();
+
+            if (listToReturn.Count != 0)
+                return listToReturn;
+
+            return NotFound();
+
+            static DownloadResult LoadSeriesInternal(string name)
+            {
+                Series? series = LoadSeriesCore(name);
+                if (series == null)
+                    return new DownloadResult("Series could not be found!");
+
+                return new DownloadResult(new Series(series.MetaData, null, null));
             }
         }
 
@@ -234,7 +260,7 @@ namespace SeriesServer.Controllers
         /// <summary>
         /// Used for getting LastModified from series when editing. 
         /// </summary>
-        private readonly string LastModifiedTimeStamp = "LastModifiedTimeStamp";
+        private static readonly string LastModifiedTimeStamp = "LastModifiedTimeStamp";
 
         /// <summary>
         /// Helper function for getting series from internal memory db.
@@ -333,8 +359,8 @@ namespace SeriesServer.Controllers
         [JsonObject]
         public sealed class Series
         {
-            [JsonProperty]
-            public double[] Values { get; set; } = null!;
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public double[]? Values { get; set; } = null;
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public DateTime[]? Dates { get; set; }
@@ -345,7 +371,7 @@ namespace SeriesServer.Controllers
 
             public Series() { }
 
-            public Series(Dictionary<string, object> metaData, double[] values, DateTime[]? dates = null)
+            public Series(Dictionary<string, object> metaData, double[]? values, DateTime[]? dates = null)
             {
                 Values = values;
                 MetaData = metaData;
@@ -491,16 +517,19 @@ namespace SeriesServer.Controllers
             public bool Search { get; set; }
             [JsonProperty]
             public bool EditSeries { get; set; }
-
-            public Implements(bool browse, bool search, bool editSeries)
-            {
-                Browse = browse;
-                Search = search;
-                EditSeries = editSeries;
-            }
+            [JsonProperty]
+            public bool AllowMultipleSeriesPerRequest  { get; set; }
+            [JsonProperty]
+            public bool Meta { get; set; }
+            [JsonProperty]
+            public bool Revisions { get; set; }
+            [JsonProperty]
+            public bool RevisionsRelease { get; set; }
+            [JsonProperty]
+            public bool RevisionsCompleteHistory { get; set; }
         }
 
-        private static readonly object m_lock = new();
+        private static readonly Lock m_lock = new ();
 
         // Sample data
 
@@ -510,14 +539,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
+                    { "PrimName", "pltour0001" },
                     { "Description", "Total" },
                     { "Region", new string[] { "pl", "se"} },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2003, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "pltour0001" },
-                    { "LastModifiedTimeStamp", new DateTime(2003, 01, 01, 0, 0, 0) },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 01, 01, 0, 0, 0) },
                 },
                 [
                     4319590.0d, 4059520.0d, 3605839.0d, 3280645.0d, 2460560.0d, 2401899.0d, 2187680.0d, 2124118.0d, 2194190.0d, 2436125.0d, 2863790.0d, 3267168.0d, 4067560.0d, 3926772.0d, 3389729.0d,
@@ -540,13 +569,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
+                    { "PrimName", "pltrad0021" },
                     { "Description", "Other" },
                     { "Region", "pl" },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2004, 11, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "pltrad0021" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 02, 01, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     105.6, 99.8, 106.1, 93.9, 107.3, 109, 104.1, 107.2, 105.3, 99.2, 98.3, 103.9, 98.3, 103.1, 105.5, 105.6, 101, 104.8, 96.6, 101.7, 103.2, 97.5, 106, 110.3, 103.5, 103.4, 104.2,
@@ -562,13 +592,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
+                    { "PrimName", "pltrad0014" },
                     { "Description", "Food" },
                     { "Region", "pl" },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2002, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "pltrad0014" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 03, 01, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     117.1, 112.3, 116.3, 104.2, 110.9, 121.6, 99.8, 109.4, 108.7, 105.5, 108.8, 114.2, 104.6, 109.5, 107.7, 105.4, 108.8, 107.9, 108.6, 111, 112.2, 110.9, 120, 121, 117.8, 124.2, 124,
@@ -585,13 +616,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
+                    { "PrimName", "ecb_stsmplwcregpc00003abs" },
                     { "Description", "New Passenger Car" },
                     { "Region", "pl" },
                     { "Source", "src_ecb" },
                     { "StartDate", new DateTime(2003, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "ecb_stsmplwcregpc00003abs" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 04, 01, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     36179, 48945, 48034, 48014, 46473, 46133, 52224, 44408, 45141, 48248, 41836, 39173, 28955, 55731, 46904, 45846, 43263, 46041, 52013, 42755, 45292, 51034, 40990, 41158, 38009,
@@ -609,13 +641,13 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
+                    { "PrimName", "pltrad0135" },
                     { "Description", "Total" },
                     { "Region", "se" },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2005, 01, 01, 0, 0, 0) },
                     { "Frequency", "annual" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "pltrad0135" },
                 },
                 [
                     26200000000, 23367941400, 18859110800, 16841434600, 15174652800, 15239242500, 11754934900, 10879093500, 8761157500, 7639377800, 5907934000, 5726277300, 6568862600, 5974127000,
@@ -625,13 +657,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
+                    { "PrimName", "pltrad0131" },
                     { "Description", "Total" },
                     { "Region", "se" },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(2005, 01, 01, 0, 0, 0) },
                     { "Frequency", "annual" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "pltrad0131" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 06, 01, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     27600000000, 25027500000, 22135300000, 19773500000, 17168200000, 17430700000, 16579900000, 14139100000, 13560300000, 10722000000, 10975000000, 9621600000, 8688200000, 7819500000,
@@ -641,13 +674,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
+                    { "PrimName", "pltrad0051" },
                     { "Description", "Total" },
                     { "Region", "pl" },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "pltrad0051" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 07, 01, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
@@ -678,13 +712,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
+                    { "PrimName", "setrad2195" },
                     { "Description", "Total" },
                     { "Region", "se" },
                     { "Source", "src_sescb" },
                     { "StartDate", new DateTime(2000, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "setrad2195" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 08, 01, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
@@ -714,12 +749,13 @@ namespace SeriesServer.Controllers
             new Series(
                 new Dictionary<string, object>
                 {
+                    { "PrimName", "dt" },
                     { "Description", "DateTime skip test" },
                     { "Region", "mb" },
                     { "Source", "me" },
                     { "StartDate", new DateTime(2017, 01, 01, 0, 0, 0) },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "dt" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 09, 01, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     5, 4, 3, 4,
@@ -736,13 +772,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>()
                 {
+                    { "PrimName", "setrad2136" },
                     { "Description", "Total, Goods" },
                     { "Region", "se" },
                     { "Source", "src_sescb" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "setrad2136" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 10, 01, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
@@ -773,13 +810,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
+                    { "PrimName", "setrad2128" },
                     { "Description", "Total, except of Motor Vehicles" },
                     { "Region", "se" },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1996, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "setrad2128" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 11, 01, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     139339400000, 122301700000, 104821000000, 88632500000, 72138400000, 54068200000, 35329100000, 18879900000, 188848100000, 177674900000, 156903400000, 136973300000, 118474100000,
@@ -810,13 +848,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
+                    { "PrimName", "ecb_stsmsewcregpc00003abs" },
                     { "Description", "New Passenger Car" },
                     { "Region", "se" },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1990, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "ecb_stsmsewcregpc00003abs" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 12, 01, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     27088, 29598, 23061, 32620, 31146, 30099, 30943, 23264, 19719, 23934, 25343, 22506, 19969, 23999, 12581, 67887, 36775, 34041, 38051, 27350, 22128, 35245, 31893, 32309, 32062,
@@ -840,13 +879,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
+                    { "PrimName", "setrad1588" },
                     { "Description", "Balance (Goods)" },
                     { "Region", "se" },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1995, 01, 01, 0, 0, 0) },
                     { "Frequency", "quarterly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "setrad1588" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 12, 02, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     116, 116, 119, 105, 114, 112, 115, 102, 108, 106, 108, 97, 105, 101, 105, 96, 102, 97, 99, 93, 98, 95, 97, 91, 98, 95, 98, 94, 101, 100, 100, 98, 101, 100, 102, 89, 94, 84, 84, 76,
@@ -858,13 +898,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
+                    { "PrimName", "setour0039" },
                     { "Description", "United States" },
                     { "Region", "se" },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1978, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "setour0039" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 12, 03, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     119199, 159262, 123550, 87371, 58000, 55460, 43790, 42718, 51002, 53597, 58577, 75251, 111408, 127250, 104976, 68535, 46600, 46609, 35013, 34290, 43097, 43563, 47700, 70409,
@@ -893,13 +934,14 @@ namespace SeriesServer.Controllers
             (
                 new Dictionary<string, object>
                 {
+                    { "PrimName", "setour0141" },
                     { "Description", "United States" },
                     { "Region", "se" },
                     { "Source", "src_plgus" },
                     { "StartDate", new DateTime(1978, 01, 01, 0, 0, 0) },
                     { "Frequency", "monthly" },
                     { "EntityType", "TimeSeries" },
-                    { "PrimName", "setour0141" },
+                    { "LastModifiedTimeStamp", new DateTime(2020, 12, 04, 0, 0, 0, DateTimeKind.Utc) },
                 },
                 [
                     3799, 4514, 6171, 4194, 2539, 2079, 1793, 2006, 1626, 1992, 2039, 3363, 5157, 5539, 5813, 4878, 2045, 2894, 2023, 3383, 2536, 2085, 2483, 3823, 4556, 6285, 5707, 4861, 2661, 2672,
