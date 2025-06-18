@@ -41,6 +41,8 @@ namespace SeriesServer.Controllers
 
         private static readonly bool ImplementsRevisions = true;
 
+        private static readonly bool ImplementsRevisionsCompleteHistory = true;
+
         /// <summary>
         /// Declare if this server support Browse, Search and Edit. This will enable features in the client application.
         /// </summary>
@@ -48,7 +50,7 @@ namespace SeriesServer.Controllers
         [HttpGet("getcapabilities")]
         public ActionResult<Implements> GetCapabilities()
         {
-            return new Implements { AllowMultipleSeriesPerRequest = ImplementsLoadingMultipleSeries, Browse = ImplementsBrowse, Search = ImplementsSearch, EditSeries = ImplementsEditSeries, Meta = ImplementsMeta, Revisions = ImplementsRevisions };
+            return new Implements { AllowMultipleSeriesPerRequest = ImplementsLoadingMultipleSeries, Browse = ImplementsBrowse, Search = ImplementsSearch, EditSeries = ImplementsEditSeries, Meta = ImplementsMeta, Revisions = ImplementsRevisions, RevisionsCompleteHistory = ImplementsRevisionsCompleteHistory };
         }
 
         /// <summary>
@@ -158,6 +160,37 @@ namespace SeriesServer.Controllers
                 }).ToArray();
             }
         }
+
+        /// <summary>
+        /// Returns all vintages of a series.
+        /// </summary>
+        /// <param name="name">The name of series to load.</param>
+        /// <returns>The vintage.</returns>
+        /// <remarks>This method is optional and may be called if <see cref="Implements.Revisions"/> is <see langword="true"/>.</remarks>
+        [HttpGet("loadcompletehistory")]
+        public ActionResult<List<Series>> LoadCompleteHistory([Required][FromQuery(Name = "n")] string name)
+        {
+            lock (m_lock)
+            {
+                if (!m_dataBase.TryGetValue(name, out var items))
+                    return NotFound();
+
+                List<Series> result = new(items.Count);
+
+                foreach (var series in items)
+                {
+                    Dictionary<string, object> meta = new(series.MetaData)
+                    {
+                        ["RevisionSeriesType"] = "vintage",
+                        ["RevisionTimeStamp"] = series.MetaData[LastModifiedTimeStamp],
+                    };
+                    result.Add(new Series(meta, series.Values, series.Dates));
+                }
+
+                return result;
+            }
+        }
+
 
         /// <summary>
         /// Creaste or replace a series.
