@@ -40,7 +40,7 @@ For more details about the Kestrel server see the [Microsoft documentation](http
 When the server is up an running, you can configure the Macrobond Application to be aware of this database.
 1. In the respcitive folder in this repository there is a sample configuration file called configWebApi.xml. Make sure that it points to the server URL. The token variant will have a configuration parameter *UseOAuth* set.
 1. In the Macrobond application, select Configure|Settings then go to the "My series" tab.
-1. Select to add a new database of type "Web API"
+1. Select to add a new database of type "Web API Series Provider"
 1. Call it `Test`, set the prefix to `test` and specify the path of the config file.
 1. For password authentication
     1. Fill username.
