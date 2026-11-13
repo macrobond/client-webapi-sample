@@ -16,7 +16,7 @@ git clone https://github.com/macrobond/client-webapi-sample.git client-webapi-sa
 ```
 This repository contains two folders, one for password based authentication named *client-webapi-sample-password* and one for token based authentication named *client-webapi-sample-token*. The structure of the folders are quite similar, they both contain a solution named SeriesServer.
 ## Building the server
-The sample is using .NET 8.0. You can find more information and download the SDK at the [Microsoft site](https://dotnet.microsoft.com/download/dotnet-core)
+The sample is using .NET 10.0. You can find more information and download the SDK at the [Microsoft site](https://dotnet.microsoft.com/download/dotnet-core)
 
 The solution file SeriesServer.sln can be opened in Visual Studio 2022, but you can also compile it from the command prompt and use other tools such as [Visual Studio Code](https://code.visualstudio.com/).
 The sample should be able to compile and run on Windows and Linux.
