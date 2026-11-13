@@ -23,7 +23,12 @@ The sample should be able to compile and run on Windows and Linux.
 
 if you do not want to use a development environment, you can build and run from the command prompt.
 ```bash
-cd client-webapi-sample/SeriesServer
+cd client-webapi-sample-password/SeriesServer
+dotnet run
+```
+or
+```bash
+cd client-webapi-sample-token/SeriesServer
 dotnet run
 ```
 ## Running the server
